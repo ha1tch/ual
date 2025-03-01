@@ -135,27 +135,6 @@ The ual compiler is designed for flexibility and performance:
 - **Optimization passes** for efficient code generation
 - **Small runtime footprint** suitable for constrained environments
 
-## Getting Started
-
-To start using ual:
-
-1. Install the ual compiler for your platform
-2. Create a source file with the `.ual` extension
-3. Write your code following the ual specification
-4. Compile targeting your desired platform
-5. Deploy the resulting binary
-
-## Documentation
-
-For detailed information, please refer to:
-
-- The ual language specification
-- Standard library documentation
-- Target platform guides
-- Example programs
-
-## Philosophy
-
 ual embraces the following design principles:
 
 - **Minimalism**: A concise core with carefully selected features
@@ -163,9 +142,9 @@ ual embraces the following design principles:
 - **Accessibility**: Familiar syntax with modern programming constructs
 - **Efficiency**: Optimized for resource-constrained environments
 - **Flexibility**: Multiple programming paradigms in one language
+- **Reuse**: Don't reinvent the wheel, use existing toolchains
 
 ## License
-
 ual is available under the Apache 2.0 license.
 
 ## Author
