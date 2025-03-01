@@ -1,0 +1,51 @@
+package main
+
+import "con"
+import "fmt"
+import "sys"
+import "io"
+
+-- Define the LED pin
+LED_PIN = 13
+
+-- Main function
+function main()
+  local counter = 0
+  
+  con.Cls()
+  fmt.Printf("LED Blink Example\n")
+  fmt.Printf("Press Ctrl+C to exit\n")
+  
+  -- Configure LED pin as output
+  io.PinMode(LED_PIN, io.OUTPUT)
+  
+  -- Blink LED in a loop
+  while_true(1)
+    -- Toggle LED
+    counter = counter + 1
+    
+    -- Use switch_case instead of if_true/if_false
+    switch_case(counter % 2)
+      case 1:
+        io.WritePin(LED_PIN, 1)  -- LED on
+        fmt.Printf("LED ON\n")
+      case 0:
+        io.WritePin(LED_PIN, 0)  -- LED off
+        fmt.Printf("LED OFF\n")
+    end_switch
+    
+    -- Wait for 1 second using stacked mode
+    > push(sys.Millis())
+    local start = dstack.pop()
+    
+    -- Use stacked mode for delay calculation
+    while_true(true)
+      > push(sys.Millis()) push(start) sub push:1000 lt
+      if_false(dstack.pop())
+        break
+      end_if_false
+    end_while_true
+  end_while_true
+  
+  return 0
+end

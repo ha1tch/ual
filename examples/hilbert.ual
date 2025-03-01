@@ -1,0 +1,160 @@
+package hilbert
+
+import "fmt"
+import "math"
+
+-- Scale factor for visualization
+SCALE = 4
+
+-- Custom stack for coordinate calculations
+coordStack = Stack.new()
+
+-- Convert a distance along the Hilbert curve to (x,y) coordinates
+function D2XY(n, d)
+  local x, y = 0, 0
+  local rx, ry, t = 0, 0, d
+  
+  -- Loop through each bit pair in the distance
+  for s = 1, n do
+    @coordStack > push(t) push:2 rot
+    rx = coordStack.pop() & 1  -- Extract bit
+    
+    @coordStack > push(t) push:1 rot bit_xor push:1 bit_and
+    ry = coordStack.pop()
+    
+    -- Rotate coordinates based on quadrant
+    if ry == 0 then
+      if rx == 1 then
+        -- Quadrant 1 transformation: reflect across y=x
+        x, y = (s-1) - y, (s-1) - x
+      end
+      
+      -- Swap x and y
+      x, y = y, x
+    end
+    
+    -- Adjust coordinates based on quadrant
+    x = x + rx * s
+    y = y + ry * s
+    
+    -- Prepare for next iteration
+    @coordStack > push(t) push:2 shift_right
+    t = coordStack.pop()
+  end
+  
+  return x, y
+end
+
+-- Generate points along the Hilbert curve
+function GeneratePoints(order)
+  local n = math.pow(2, order)
+  local points = {}
+  
+  -- Calculate points for each step along the curve
+  for i = 0, n*n-1 do
+    local x, y = D2XY(n, i)
+    
+    -- Scale points for visualization
+    x = x * SCALE
+    y = y * SCALE
+    
+    points[i+1] = {x = x, y = y}
+  end
+  
+  return points
+end
+
+-- Print a visual representation of the Hilbert curve
+function PrintCurve(order)
+  local n = math.pow(2, order)
+  local size = n * SCALE
+  
+  -- Create a grid
+  local grid = {}
+  for y = 0, size-1 do
+    grid[y] = {}
+    for x = 0, size-1 do
+      grid[y][x] = " "
+    end
+  end
+  
+  -- Generate Hilbert curve points
+  local points = GeneratePoints(order)
+  
+  -- Mark points on the grid
+  for i = 1, #points-1 do
+    local x1, y1 = points[i].x, points[i].y
+    local x2, y2 = points[i+1].x, points[i+1].y
+    
+    -- Draw a character at this point
+    grid[y1][x1] = "●"
+    
+    -- Draw a line to the next point
+    @coordStack > push(x2) push(x1) sub
+    local dx = coordStack.pop()
+    
+    @coordStack > push(y2) push(y1) sub
+    local dy = coordStack.pop()
+    
+    -- For simplicity, we're only drawing horizontal and vertical lines
+    if dx ~= 0 then
+      local step = dx > 0 and 1 or -1
+      for x = x1, x2, step do
+        grid[y1][x] = dx > 0 and "─" or "─"
+      end
+    elseif dy ~= 0 then
+      local step = dy > 0 and 1 or -1
+      for y = y1, y2, step do
+        grid[y][x1] = dy > 0 and "│" or "│"
+      end
+    end
+  end
+  
+  -- Mark the last point
+  local last = points[#points]
+  grid[last.y][last.x] = "●"
+  
+  -- Print the grid
+  fmt.Printf("Hilbert Curve (Order %d):\n\n", order)
+  for y = 0, size-1 do
+    for x = 0, size-1 do
+      fmt.Printf("%s", grid[y][x])
+    end
+    fmt.Printf("\n")
+  end
+end
+
+-- Draw Hilbert curves of different orders
+function Demo()
+  fmt.Printf("Hilbert Curve Demo\n")
+  fmt.Printf("==================\n\n")
+  
+  -- Generate different orders of Hilbert curves
+  switch_case(3)
+    case 1, 2, 3:
+      PrintCurve(1)
+      fmt.Printf("\n")
+      PrintCurve(2)
+      fmt.Printf("\n")
+      PrintCurve(3)
+    default:
+      PrintCurve(2)
+  end_switch
+end
+
+-- Helper functions for bit operations
+function bit_and(a, b)
+  return a & b
+end
+
+function bit_xor(a, b)
+  return a ^ b
+end
+
+function shift_right(value, bits)
+  return math.floor(value / math.pow(2, bits))
+end
+
+function rot(value, bits)
+  return math.floor(value / math.pow(2, bits)) & 1
+end

@@ -1,0 +1,127 @@
+package main
+
+import "con"
+
+-- Define graph constants and structures
+MAX_NODES = 6
+INFINITY = 65535
+
+-- Global variables
+graph = {}
+distances = {}
+visited = {}
+
+-- Main function
+function main()
+  init_graph()
+  dijkstra(0)
+  print_results()
+  return 0
+end
+
+-- Initialize the graph with edges and weights
+function init_graph()
+  -- Initialize empty adjacency matrix
+  for i = 0, MAX_NODES-1 do
+    graph[i] = {}
+    for j = 0, MAX_NODES-1 do
+      graph[i][j] = 0
+    end
+  end
+  
+  -- Add edges (source, destination, weight)
+  add_edge(0, 1, 1)
+  add_edge(0, 2, 4)
+  add_edge(0, 3, 2)
+  add_edge(1, 3, 5)
+  add_edge(1, 4, 3)
+  add_edge(2, 4, 7)
+  add_edge(3, 5, 1)
+end
+
+-- Add an edge to the graph
+function add_edge(u, v, weight)
+  graph[u][v] = weight
+end
+
+-- Custom stack for algorithm operations
+algorithmStack = Stack.new()
+
+-- Implement Dijkstra's algorithm using stack operations
+function dijkstra(source)
+  -- Initialize distances and visited arrays
+  for i = 0, MAX_NODES-1 do
+    distances[i] = INFINITY
+    visited[i] = 0
+  end
+  
+  -- Set source distance to 0
+  distances[source] = 0
+  
+  -- Main algorithm loop - process all nodes
+  for i = 0, MAX_NODES-1 do
+    -- Find minimum distance unvisited node
+    local u = find_min_node()
+    
+    -- If no node found or distance is infinity, we're done
+    if u == -1 then
+      break
+    end
+    
+    -- Mark node as visited
+    visited[u] = 1
+    
+    -- Update distances to neighbors
+    update_neighbors(u)
+  end
+end
+
+-- Find the unvisited node with minimum distance
+function find_min_node()
+  local min_dist = INFINITY
+  local min_node = -1
+  
+  -- Check each node
+  for v = 0, MAX_NODES-1 do
+    -- If not visited and distance is less than current minimum
+    if visited[v] == 0 then
+      @algorithmStack > push(distances[v]) push(min_dist) lt
+      if algorithmStack.pop() then
+        min_dist = distances[v]
+        min_node = v
+      end
+    end
+  end
+  
+  return min_node
+end
+
+-- Update distances to neighbors of node u
+function update_neighbors(u)
+  -- For each potential neighbor, use stacked mode for calculations
+  for v = 0, MAX_NODES-1 do
+    -- Check if there's an edge
+    if graph[u][v] > 0 then
+      @algorithmStack > push(distances[u]) push(graph[u][v]) add
+      local new_dist = algorithmStack.pop()
+      
+      -- Simple conditional for distance comparison
+      if new_dist < distances[v] then
+        distances[v] = new_dist
+      end
+    end
+  end
+end
+
+-- Print the results
+function print_results()
+  con.Print("Shortest paths from source:\n")
+  
+  for i = 0, MAX_NODES-1 do
+    if distances[i] == INFINITY then
+      con.Printf("Node %d: unreachable\n", i)
+    else
+      con.Printf("Node %d: %d\n", i, distances[i])
+    end
+  end
+end
