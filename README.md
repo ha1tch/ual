@@ -2,44 +2,60 @@
 
 ## Overview
 
-ual is a high-level, stack-based language designed for use on minimal or retro platforms with small virtual machines or embedded hardware. It bridges the gap between low-level hardware control and high-level programming abstractions, making it ideal for resource-constrained environments.
+ual is a high-level, stack-based programming language designed for resource-constrained environments like embedded systems and retro computing platforms. What distinguishes ual is its unified approach to program safety through a consistent stack-based paradigm, bridging the gap between low-level hardware control and high-level programming abstractions without sacrificing safety or performance.
 
 ## Key Features
 
 - **Stack-based operations** for arithmetic and memory access
+- **Container-centric type system** where types are properties of stacks rather than values
+- **Stack-based memory safety** through ownership and borrowing (proposed in 1.5)
+- **Error propagation** via dedicated error stack with compile-time tracking (proposed in 1.4)
+- **Zero runtime overhead** for safety features through compile-time checking
 - **Lua-style** control flow, scoping, and data structures
 - **Go-like package** conventions (uppercase = exported, lowercase = private)
-- **Binary/hexadecimal literals** for hardware-oriented programming
-- **Bitwise operators** for direct register and mask manipulation
+- **Binary/hexadecimal literals** and **bitwise operators** for hardware-oriented programming
 - **Multiple return values** and flexible iteration constructs
-- **Cross-platform compilation** targeting various architectures
+
+## Distinctive Approach to Safety
+
+ual takes a unique approach to program safety by unifying three traditionally separate concerns:
+
+1. **Type Safety**: Types are attributes of stacks (containers), not values. The `bring_<type>` operation atomically transfers values between stacks with appropriate type conversion.
+
+2. **Memory Safety**: Ownership is tied to stacks, with explicit transfer operations. This provides Rust-like memory safety guarantees with more visible ownership flow (proposed in 1.5).
+
+3. **Error Control**: Errors propagate through a dedicated error stack that is tracked by the compiler, ensuring errors cannot be silently ignored (proposed in 1.4).
+
+This unified stack-based approach provides strong safety guarantees with zero runtime overhead—critical for embedded systems where both reliability and efficiency are essential.
 
 ## Language Inspirations
 
-ual draws inspiration from several established languages:
+ual synthesizes concepts from several established languages while creating its own path:
 
-- **From Lua**: The clean syntax, function definitions, local variables, tables as the primary data structure, and multiple return values.
+- **From Lua**: Clean syntax, function definitions, tables, and multiple returns
+- **From Forth**: Stack-based computation model and resource efficiency
+- **From Go**: Package system and pragmatic design philosophy
+- **From Rust**: Compile-time safety guarantees without runtime cost
+- **From Factor**: Advanced stack-based programming techniques
 
-- **From Forth**: The stack-based computational model, direct hardware access, and emphasis on small implementation footprint.
-
-- **From Go**: The package system with uppercase/lowercase visibility rules, clear import declarations, and pragmatic approach to language design.
-
-## Example
+## Basic Example
 
 ```lua
 package main
 
-import "con"
 import "fmt"
 
-function main()
-  -- Basic calculation using stack operations
-  push(10)
-  push(20)
-  add()  -- Adds top two stack values
+function calculate(a, b)
+  -- Push values onto the Integer stack
+  @Stack.new(Integer): alias:"i"
+  @i: push(a) push(b) mul
   
-  -- Display the result
-  fmt.Printf("Result: %d\n", pop())
+  return i.pop()
+end
+
+function main()
+  result = calculate(10, 20)
+  fmt.Printf("Result: %d\n", result)
   
   -- Bitwise operations for hardware access
   local port_value = 0x55 & 0x0F  -- Mask off high bits
@@ -49,76 +65,118 @@ function main()
 end
 ```
 
-## Stacked Mode Example
+## Stacked Mode and Type Conversion Example
 
-ual's stacked mode provides concise, Forth-like expressiveness while maintaining readability:
+ual's stacked mode provides concise notation while the type system ensures safety:
 
 ```lua
 package main
 
 import "fmt"
 
--- Implement the Fibonacci sequence using stack operations
-function fibonacci(n)
-  -- Using stacked mode with the '>' prefix
-  > push:1 push:1                -- Initialize with first two Fibonacci numbers
+function process_data(raw_input)
+  -- Create typed stacks with aliases for clarity
+  @Stack.new(String): alias:"s"
+  @Stack.new(Float): alias:"f"
+  @Stack.new(Integer): alias:"i"
   
-  > push(n) push:2 sub           -- Calculate how many more numbers to generate
-  while_true(dstack.peek() > 0)
-    > over over add              -- Add the top two numbers
-    > rot drop                   -- Remove the oldest number
-    > push(dstack.peek(1)) push:1 sub  -- Decrement counter
-  end_while_true
+  -- Parse string input and convert between types
+  @s: push(raw_input)
+  @s: split:","              -- Split CSV format data
   
-  > drop                         -- Remove the counter
-  return dstack.pop()            -- Return the nth Fibonacci number
+  -- Convert string to float (shorthand for bring_string)
+  @f: <s
+  
+  -- Perform calculation with direct mathematical expression
+  @f: dup (9/5)*32 sum       -- Convert Celsius to Fahrenheit
+  
+  -- Convert float to integer (truncating decimal)
+  @i: <f
+  
+  -- Format results
+  @s: push("Result: ") push(i.pop()) concat
+  
+  return s.pop()
 end
 
 function main()
-  -- Calculate some Fibonacci numbers
-  for i = 1, 10 do
-    fmt.Printf("Fibonacci %d: %d\n", i, fibonacci(i))
-  end
-  
-  -- Demonstrate multi-stack operations
-  @dstack > push:10 push:20 mul  -- Use data stack
-  @rstack > push:5 push:5 add    -- Use return stack
-  
-  -- Combine results from both stacks
-  > push(rstack.pop()) mul
-  
-  fmt.Printf("Result of stack operations: %d\n", dstack.pop())
-  
+  fmt.Printf("%s\n", process_data("25.5"))
   return 0
 end
 ```
 
-This example demonstrates how ual's stacked mode combines the expressiveness of Forth-style stack manipulation with the readability and structure of a modern language. The `>` prefix denotes stacked mode lines, and the `@stack >` syntax allows operations on specific stacks.
+## Memory Safety Example (Proposed in 1.5)
+
+```lua
+function handle_resource(filename)
+  -- Create an owned resource stack
+  @Stack.new(Resource, Owned): alias:"ro"
+  @ro: push(open_file(filename))
+  
+  -- Borrow immutably for reading
+  @Stack.new(Resource, Borrowed): alias:"rb"
+  @rb: <<ro                       -- Borrow without consuming
+  read_config(rb.pop())
+  
+  -- Borrow mutably for writing
+  @Stack.new(Resource, Mutable): alias:"rm"
+  @rm: <:mut ro                   -- Mutable borrow
+  write_config(rm.pop())
+  
+  -- Resource automatically closed when owned stack goes out of scope
+  return true
+end
+```
+
+## Error Handling Example (Proposed in 1.4)
+
+```lua
+@error > function read_file(filename)
+  if file_not_accessible then
+    @error > push("Cannot access file: " .. filename)
+    return nil
+  end
+  return file_contents
+end
+
+function process()
+  content = read_file("config.txt")
+  if @error > depth() > 0 then
+    err = @error > pop()
+    fmt.Printf("Error: %s\n", err)
+    return false
+  end
+  
+  -- Process content
+  return true
+end
+```
 
 ## Use Cases
 
 ual is particularly well-suited for:
 
-- **Embedded systems programming** on microcontrollers
-- **Retro computing** on vintage hardware
-- **Resource-constrained IoT devices**
-- **Educational environments** for teaching programming concepts
+- **Embedded systems programming** where safety and efficiency are both critical
+- **Resource-constrained IoT devices** that can't afford runtime overhead
+- **Retro computing** and vintage hardware
 - **Cross-platform development** spanning modern and classic architectures
+- **Educational environments** for teaching both stack-based programming and safety concepts
 
 ## The UALSYSTEM Architecture
 
-ual serves as the foundation for the UALSYSTEM cross-compilation architecture, which enables code written in different paradigms (register-based, stack-based) to target multiple hardware platforms:
+ual serves as the foundation for the UALSYSTEM cross-compilation architecture, which enables code written in different paradigms to target multiple hardware platforms:
 
 - Classic Z80 hardware
 - Uxn virtual machines
 - Modern RISC-V platforms (including ESP32)
+- AVR microcontrollers
 - And more
 
 This approach allows developers to work in their familiar programming model while deploying to a wide range of platforms.
 
 ## Standard Library
 
-ual includes a minimal yet practical standard library:
+ual includes a practical standard library:
 
 - **con** - Console operations
 - **fmt** - String formatting
@@ -127,22 +185,25 @@ ual includes a minimal yet practical standard library:
 - **str** - String manipulation
 - **math** - Basic numeric functions
 
-## Compiler Implementation
-
-The ual compiler is designed for flexibility and performance:
-
-- **Multi-tiered compilation** to various target platforms
-- **Optimization passes** for efficient code generation
-- **Small runtime footprint** suitable for constrained environments
+## Design Philosophy
 
 ual embraces the following design principles:
 
-- **Minimalism**: A concise core with carefully selected features
-- **Practicality**: Real-world utility for embedded and retro computing
-- **Accessibility**: Familiar syntax with modern programming constructs
-- **Efficiency**: Optimized for resource-constrained environments
-- **Flexibility**: Multiple programming paradigms in one language
-- **Reuse**: Don't reinvent the wheel, use existing toolchains
+- **Unified Safety Model**: Type safety, memory safety, and error control through a consistent paradigm
+- **Zero Runtime Overhead**: Safety guarantees without performance penalties
+- **Explicitness**: Making operations like type conversions and ownership transfers visible
+- **Progressive Complexity**: Simple operations remain simple, complexity available when needed
+- **Dual Paradigm**: Combining stack-based and variable-based programming styles
+- **Resource Efficiency**: Optimized for constrained environments
+- **Hardware Accessibility**: Direct access to hardware when needed
+
+## Current Status
+
+ual is an evolving language with:
+
+- **ual 1.3**: Current stable version with stack operations, typed stacks, and switch statements
+- **ual 1.4**: Proposed extensions including error stack mechanism, macro system, and advanced typed stacks
+- **ual 1.5**: Proposed stack-based ownership system for memory safety
 
 ## License
 ual is available under the Apache 2.0 license.
