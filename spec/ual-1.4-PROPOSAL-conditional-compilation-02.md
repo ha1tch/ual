@@ -2,7 +2,7 @@
 
 ## 1. Introduction
 
-This document proposes an integrated approach to conditional compilation for the UAL programming language. Conditional compilation is essential for embedded systems development where code must adapt to different hardware platforms, memory constraints, and optional features. Instead of introducing a separate preprocessor with its own syntax (as in C/C++), this proposal recommends leveraging UAL's macro system to provide a more cohesive and maintainable approach to platform-specific code generation.
+This document proposes an integrated approach to conditional compilation for the ual programming language. Conditional compilation is essential for embedded systems development where code must adapt to different hardware platforms, memory constraints, and optional features. Instead of introducing a separate preprocessor with its own syntax (as in C/C++), this proposal recommends leveraging ual's macro system to provide a more cohesive and maintainable approach to platform-specific code generation.
 
 ## 2. Background and Motivation
 
@@ -28,17 +28,17 @@ Existing approaches to conditional compilation have significant drawbacks:
 
 3. **Build System Complexity**: Relying on build systems for conditional inclusion often leads to complex build scripts that are difficult to maintain and understand.
 
-### 2.3 The UAL Opportunity
+### 2.3 The ual Opportunity
 
-UAL's design philosophy emphasizes simplicity, predictability, and zero runtime overhead—ideally suited for embedded systems. By integrating conditional compilation directly into UAL's macro system, we can provide powerful capabilities while maintaining language cohesion and avoiding the pitfalls of separate preprocessor languages.
+ual's design philosophy emphasizes simplicity, predictability, and zero runtime overhead—ideally suited for embedded systems. By integrating conditional compilation directly into ual's macro system, we can provide powerful capabilities while maintaining language cohesion and avoiding the pitfalls of separate preprocessor languages.
 
 ## 3. Design Principles
 
-The proposed conditional compilation system for UAL adheres to these principles:
+The proposed conditional compilation system for ual adheres to these principles:
 
 1. **Zero Runtime Overhead**: All conditional compilation occurs at compile time with no impact on runtime performance.
 
-2. **Syntactic Consistency**: Conditional compilation uses standard UAL syntax rather than introducing a separate preprocessor dialect.
+2. **Syntactic Consistency**: Conditional compilation uses standard ual syntax rather than introducing a separate preprocessor dialect.
 
 3. **Readability**: Conditional code should be easy to read and understand, with clear boundaries and minimal nesting complexity.
 
@@ -61,7 +61,7 @@ FEATURES        -- Table of enabled features (e.g., FEATURES.hardware_float)
 DEBUG           -- Boolean indicating if this is a debug build
 USE_SOFTWARE_FLOAT -- Boolean that can override hardware floating-point
 CPU_BITS        -- Integer indicating the target CPU bit width (8, 16, 32, etc.)
-COMPILER_VERSION -- String indicating the UAL compiler version
+COMPILER_VERSION -- String indicating the ual compiler version
 ```
 
 These variables would be set through compiler flags or build configuration files:
@@ -535,11 +535,11 @@ This powerful combination enables generating customized code for specific platfo
 
 ## 5. Comparison with Other Languages
 
-UAL's approach to conditional compilation draws inspiration from several languages while maintaining its own simplicity and consistency:
+ual's approach to conditional compilation draws inspiration from several languages while maintaining its own simplicity and consistency:
 
 ### 5.1 Elixir-Like Integration
 
-Like Elixir, UAL uses the language's own constructs instead of a separate preprocessor dialect. Conditionals feel like regular code, and the same language semantics apply.
+Like Elixir, ual uses the language's own constructs instead of a separate preprocessor dialect. Conditionals feel like regular code, and the same language semantics apply.
 
 **Elixir:**
 ```elixir
@@ -550,7 +550,7 @@ if target() == :avr do
 end
 ```
 
-**UAL (Proposed):**
+**ual (Proposed):**
 ```lua
 macro_expand when(TARGET == "AVR", [[
   function init_timers()
@@ -563,7 +563,7 @@ Both approaches avoid introducing a separate preprocessor language, leading to b
 
 ### 5.2 Rust-Like Feature Flags
 
-Similar to Rust's feature system, UAL supports granular feature toggling for including or excluding functionality.
+Similar to Rust's feature system, ual supports granular feature toggling for including or excluding functionality.
 
 **Rust:**
 ```rust
@@ -578,7 +578,7 @@ fn calculate(x: f32) -> f32 {
 }
 ```
 
-**UAL (Proposed):**
+**ual (Proposed):**
 ```lua
 macro_expand when(FEATURES.hardware_float, [[
   function calculate(x)
@@ -597,7 +597,7 @@ Both approaches allow for fine-grained control over which features are included 
 
 ### 5.3 Unlike C Preprocessor
 
-UAL avoids the pitfalls of C's `#ifdef`/`#endif` approach, which often leads to hard-to-read nested conditions and challenging maintenance.
+ual avoids the pitfalls of C's `#ifdef`/`#endif` approach, which often leads to hard-to-read nested conditions and challenging maintenance.
 
 **C:**
 ```c
@@ -617,7 +617,7 @@ void init_timers(void) {
 #endif
 ```
 
-**UAL (Proposed):**
+**ual (Proposed):**
 ```lua
 macro_expand when(TARGET == "AVR", [[
   function init_timers()
@@ -637,11 +637,11 @@ macro_expand when(TARGET == "AVR", [[
 ]])
 ```
 
-UAL's approach is more readable and maintainable, especially for complex conditional compilation scenarios.
+ual's approach is more readable and maintainable, especially for complex conditional compilation scenarios.
 
 ### 5.4 Unlike Go's File-Level Approach
 
-While Go uses file-level build tags, UAL allows for more fine-grained control within files, reducing code duplication.
+While Go uses file-level build tags, ual allows for more fine-grained control within files, reducing code duplication.
 
 **Go (file-level approach):**
 ```go
@@ -666,7 +666,7 @@ func InitUART() {
 }
 ```
 
-**UAL (Proposed, within a single file):**
+**ual (Proposed, within a single file):**
 ```lua
 macro_expand when(TARGET == "AVR", [[
   function init_uart()
@@ -681,7 +681,7 @@ macro_expand when(TARGET == "ESP32", [[
 ]])
 ```
 
-UAL's approach reduces the need for multiple files when the conditional parts are small or numerous.
+ual's approach reduces the need for multiple files when the conditional parts are small or numerous.
 
 ## 6. Implementation Considerations
 
@@ -736,8 +736,8 @@ Local variables and functions defined in conditional blocks have some special co
 
 ## 8. Conclusion
 
-The proposed conditional compilation system for UAL leverages the language's existing macro capabilities to provide a clean, consistent, and powerful approach to platform-specific code and feature toggling. This approach maintains UAL's focus on simplicity and embedded systems suitability while avoiding the pitfalls of traditional preprocessor directives.
+The proposed conditional compilation system for ual leverages the language's existing macro capabilities to provide a clean, consistent, and powerful approach to platform-specific code and feature toggling. This approach maintains ual's focus on simplicity and embedded systems suitability while avoiding the pitfalls of traditional preprocessor directives.
 
-By keeping conditional compilation within the language rather than adding a separate preprocessor layer, UAL code remains more readable, maintainable, and integrated. The combination of conditional compilation with code generation provides particularly powerful capabilities for cross-platform embedded development.
+By keeping conditional compilation within the language rather than adding a separate preprocessor layer, ual code remains more readable, maintainable, and integrated. The combination of conditional compilation with code generation provides particularly powerful capabilities for cross-platform embedded development.
 
-This proposal recommended adoption of this approach for UAL 1.4, along with standardization of the compile-time variable names and conditional macro interfaces.
+This proposal recommended adoption of this approach for ual 1.4, along with standardization of the compile-time variable names and conditional macro interfaces.
