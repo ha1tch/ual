@@ -4,6 +4,12 @@
 
 ual is a high-level, stack-based programming language designed for resource-constrained environments like embedded systems and retro computing platforms. What distinguishes ual is its unified approach to program safety through a consistent stack-based paradigm, bridging the gap between low-level hardware control and high-level programming abstractions without sacrificing safety or performance.
 
+### Quick Links
+
+- [Current Specification (v1.3)](https://github.com/ha1tch/ual/spec/blob/main/ual-1.3-spec-P1.md)
+- [Unified Stack-Based Safety Approach](https://github.com/ha1tch/ual/spec/blob/main/ual-1.4-DESIGN-unified-stack-approach.md)
+- [Explore the Language Evolution](#language-evolution)
+
 ## Key Features
 
 - **Stack-based operations** for arithmetic and memory access
@@ -197,13 +203,23 @@ ual embraces the following design principles:
 - **Resource Efficiency**: Optimized for constrained environments
 - **Hardware Accessibility**: Direct access to hardware when needed
 
-## Current Status
+## Language Evolution
 
 ual is an evolving language with:
 
 - **ual 1.3**: Current stable version with stack operations, typed stacks, and switch statements
-- **ual 1.4**: Proposed extensions including error stack mechanism, macro system, and advanced typed stacks
-- **ual 1.5**: Proposed stack-based ownership system for memory safety
+  - [Language Basics (Part 1)](https://github.com/ha1tch/ual/spec/blob/main/ual-1.3-spec-P1.md)
+  - [Stacks as First-Class Objects (Part 2)](https://github.com/ha1tch/ual/spec/blob/main/ual-1.3-spec-P2.md)
+
+- **ual 1.4**: Proposed extensions
+  - [Typed Stacks](https://github.com/ha1tch/ual/spec/blob/main/ual-1.4-PROPOSAL-typed-stacks-01.md) and [bring_&lt;type&gt; Operations](https://github.com/ha1tch/ual/spec/blob/main/ual-1.4-PROPOSAL-typed-stacks-02.md)
+  - [Error Stack Mechanism](https://github.com/ha1tch/ual/spec/blob/main/ual-1.4-PROPOSAL-error-stack.md)
+  - [Macro System](https://github.com/ha1tch/ual/spec/blob/main/ual-1.4-PROPOSAL-macros.md)
+  - [Conditional Compilation](https://github.com/ha1tch/ual/spec/blob/main/ual-1.4-PROPOSAL-conditional-compilation-02.md)
+  - [Type System Design](https://github.com/ha1tch/ual/spec/blob/main/ual-1.4-DESIGN-type-system.md)
+
+- **ual 1.5**: Future proposals
+  - [Stack-Based Ownership System](https://github.com/ha1tch/ual/spec/blob/main/ual-1.5-PROPOSAL-ownership-system.md)
 
 ## License
 ual is available under the Apache 2.0 license.
