@@ -9,15 +9,6 @@ ual is a high-level, stack-based programming language designed for resource-cons
 - [Current Specification (v1.3)](https://github.com/ha1tch/ual/blob/main/spec/ual-1.3-spec-P1.md)
 - [Unified Stack-Based Safety Approach](https://github.com/ha1tch/ual/blob/main/spec/ual-1.4-DESIGN-unified-stack-approach.md)
 - [Explore the Language Evolution](#language-evolution)
-- [Getting Started with ual](#getting-started)
-
-## Getting Started
-
-Choose a primer based on your background:
-
-- [For Mainstream Programmers](https://github.com/ha1tch/ual/blob/main/doc/primer/ual-primer-01-mainstream.md) - Coming from Python, JavaScript, Java, etc.
-- [For Embedded Systems Programmers](https://github.com/ha1tch/ual/blob/main/doc/primer/ual-primer-02-embedded.md) - Focused on hardware control and resource constraints
-- [For Retro & Minimalist Programmers](https://github.com/ha1tch/ual/blob/main/doc/primer/ual-primer-03-retro-minimalist.md) - Interested in stack-based computing and minimalism
 
 ## Key Features
 

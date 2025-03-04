@@ -1,6 +1,11 @@
 ual
 ├── LICENSE
 ├── README.md
+├── doc
+│   └── primer
+│       ├── ual-primer-01-mainstream.md
+│       ├── ual-primer-02-embedded.md
+│       └── ual-primer-03-retro-minimalist.md
 ├── examples
 │   ├── blinky.ual
 │   ├── dijkstra.ual
@@ -9,14 +14,22 @@ ual
 │   └── qsort.ual
 ├── project.tree
 ├── spec
-│   ├── EVOL-1.3.md
-│   ├── TODO-1.3.md
-│   ├── ual-1.1-spec.md
+│   ├── STATUS.md
+│   ├── _DEPRECATED-ual-1.1-spec.md
+│   ├── _DEPRECATED-ual-1.2-spec.md
 │   ├── ual-1.1-stdlib.md
-│   ├── ual-1.2-spec.md
+│   ├── ual-1.3-DESIGN.md
 │   ├── ual-1.3-spec-P1.md
 │   ├── ual-1.3-spec-P2.md
-│   └── ual-1.4-PROPOSAL-macros.md
+│   ├── ual-1.4-DESIGN-type-system.md
+│   ├── ual-1.4-DESIGN-unified-stack-approach.md
+│   ├── ual-1.4-PROPOSAL-conditional-compilation-01.md
+│   ├── ual-1.4-PROPOSAL-conditional-compilation-02.md
+│   ├── ual-1.4-PROPOSAL-error-stack.md
+│   ├── ual-1.4-PROPOSAL-macros.md
+│   ├── ual-1.4-PROPOSAL-typed-stacks-01.md
+│   ├── ual-1.4-PROPOSAL-typed-stacks-02.md
+│   └── ual-1.5-PROPOSAL-ownership-system.md
 └── ualc
     ├── blinky.ual
     ├── build.sh
@@ -31,4 +44,3 @@ ual
     ├── str.go
     ├── sys.go
     └── ualc.go
-
