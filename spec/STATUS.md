@@ -1,10 +1,10 @@
-# UAL Language Development Status
+# ual Language Development Status
 
-This document provides a comprehensive overview of the UAL programming language's development status, integrating both historical progress and future roadmap into a single reference.
+This document provides a comprehensive overview of the ual programming language's development status, integrating both historical progress and future roadmap into a single reference.
 
 ## Executive Summary
 
-UAL has evolved significantly since its inception, with version 1.3 delivering substantial improvements to stack operations and syntax, and proposed version 1.4 addressing error handling and cross-platform capabilities. Currently, 45% of originally planned features are fully implemented, with another 20% partially addressed.
+ual has evolved significantly since its inception, with version 1.3 delivering substantial improvements to stack operations and syntax, and proposed version 1.4 addressing error handling and cross-platform capabilities. Currently, 45% of originally planned features are fully implemented, with another 20% partially addressed.
 
 Next development priorities focus on:
 1. Finalizing the `@error` stack system for robust error management
@@ -17,7 +17,6 @@ Next development priorities focus on:
 | Version | Status | Key Achievements |
 |---------|--------|------------------|
 | 1.1 | Released | Initial specification, standard library, basic stack operations |
-| 1.2 | Released | [Undocumented in provided materials] |
 | 1.3 | Released | First-class stack objects, stacked mode syntax, switch statement |
 | 1.4 | Proposed | Error stack system, macro system, conditional compilation |
 
@@ -66,7 +65,7 @@ Next development priorities focus on:
 
 ### 1.1 to 1.3 Evolution
 
-The transition from 1.1 to 1.3 represented a major advancement in UAL's design, particularly in its stack manipulation capabilities:
+The transition from 1.1 to 1.3 represented a major advancement in ual's design, particularly in its stack manipulation capabilities:
 
 1. **Stack Elevation**: Stacks evolved from a basic concept to first-class objects that can be created, manipulated, and passed around like other values.
 
@@ -76,11 +75,11 @@ The transition from 1.1 to 1.3 represented a major advancement in UAL's design, 
 
 ### Proposed 1.3 to 1.4 Evolution
 
-The proposed enhancements for 1.4 focus on leveraging UAL's unique design to solve traditional programming challenges:
+The proposed enhancements for 1.4 focus on leveraging ual's unique design to solve traditional programming challenges:
 
-1. **Error Stack Innovation**: Instead of borrowing error handling patterns from other languages, the `@error` stack proposal extends UAL's core stack paradigm to create a native, zero-overhead error management system.
+1. **Error Stack Innovation**: Instead of borrowing error handling patterns from other languages, the `@error` stack proposal extends ual's core stack paradigm to create a native, zero-overhead error management system.
 
-2. **Macro System Integration**: The proposed macro system builds on UAL's syntax rather than introducing a separate preprocessor language, maintaining conceptual coherence while enabling powerful code generation and conditional compilation.
+2. **Macro System Integration**: The proposed macro system builds on ual's syntax rather than introducing a separate preprocessor language, maintaining conceptual coherence while enabling powerful code generation and conditional compilation.
 
 ## Current Development Priorities
 
@@ -124,7 +123,7 @@ The proposed enhancements for 1.4 focus on leveraging UAL's unique design to sol
 
 ## Long-Term Vision
 
-UAL aims to maintain its position as a uniquely powerful language for embedded systems development by:
+ual aims to maintain its position as a uniquely powerful language for embedded systems development by:
 
 1. **Balancing paradigms**: Continuing to strengthen the bridge between stack-based and variable-based programming
 
@@ -136,4 +135,4 @@ UAL aims to maintain its position as a uniquely powerful language for embedded s
 
 5. **Developer productivity**: Enhancing tooling and development experience without sacrificing performance
 
-The evolution of UAL demonstrates a pragmatic, incremental approach that maintains the language's focus on embedded systems while steadily improving its expressiveness, safety, flexibility, and developer experience.
+The evolution of ual demonstrates a pragmatic, incremental approach that maintains the language's focus on embedded systems while steadily improving its expressiveness, safety, flexibility, and developer experience.
