@@ -485,6 +485,12 @@ When chaining `.consider { ... }` on a result:
     
 - Otherwise, if the result contains an `Ok` field, the handler associated with `if_ok` is executed.
     
+- **Edge Cases**:
+    
+    - If the result contains both an `Err` field (non-nil and non-empty) and an `Ok` field, the `Err` field takes precedence and only the `if_err` handler is executed.
+    - If the result contains neither an `Err` nor an `Ok` field, no handler is executed and the operation completes silently.
+    - If the `Err` field exists but is nil or an empty value, it is treated as not present, and the system falls back to checking for the `Ok` field.
+    - If the appropriate handler (`if_ok` or `if_err`) is not provided for the evaluated condition, no action is taken for that condition.
 - Developers can use the sugar syntax:
     
     ```
@@ -508,4 +514,4 @@ When chaining `.consider { ... }` on a result:
     ```
     
 
-This feature provides a more expressive, Rust-like result handling mechanism while retaining the ability to specify full function literals when needed.
+This feature provides a more expressive, Rust-like result handling mechanism while retaining the ability to specify full function literals when needed. Unlike Rust's `Result` type, which is a strict enum allowing only one variant at a time, ual's implementation uses table fields, requiring these explicit precedence rules to ensure consistent behavior across all implementations.
