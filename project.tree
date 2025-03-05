@@ -40,7 +40,6 @@ ual
 │   ├── ual-1.5-PROPOSAL-defer.md
 │   └── ual-1.5-PROPOSAL-ownership-system.md
 └── ualc
-    ├── blinky.ual
     ├── build.sh
     ├── codegen.go
     ├── con.go
