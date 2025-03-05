@@ -10,7 +10,7 @@ Programming languages are not mere technical tools; they embody philosophical wo
 
 Forth, created by Charles Moore in the 1970s, embodied radical philosophical positions that stood in stark contrast to the prevailing programming paradigms of its time:
 
-1. **Extreme Minimalism**: Forth's tiny core vocabulary and interpreter (often under 2KB) reflected a belief that simplicity enables deeper understanding. In Moore's words: "If you can't fit your problem in your head, the solution will likely be wrong."
+1. **Extreme Minimalism**: Forth's tiny core vocabulary and interpreter (often under 2KB) reflected a belief that simplicity enables deeper understanding.
 
 2. **Direct Hardware Engagement**: Forth eliminated layers of abstraction between programmer and machine, embodying a philosophy of directness that opposed the growing trend of abstraction layering.
 
