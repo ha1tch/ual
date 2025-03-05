@@ -30,7 +30,7 @@ This approach embodied tacit knowledge in Michael Polanyi's sense—knowledge th
 
 ### Freedom and Responsibility
 
-Forth's approach emphasized extraordinary freedom coupled with extraordinary responsibility. With direct memory access, no type checking, and the ability to redefine core words, Forth embraced a libertarian ethos where programmers were trusted with capabilities that most languages carefully restricted:
+Forth's approach emphasized extraordinary freedom coupled with extraordinary responsibility. With direct memory access, no type checking, and the ability to redefine core words, Forth embraced an ethos where individual programmers were trusted with capabilities that most languages carefully restricted:
 
 ```forth
 : SELFMOD  LATEST @ CFA @ 2+ ! ;  \ Self-modifying code, directly changing word definitions
@@ -132,7 +132,7 @@ This pattern embodies several ethical principles:
 
 3. **Transparency**: Errors are made explicit rather than hidden, creating transparency about system behavior.
 
-By making error handling a first-class concern, ual shifts from Forth's "programmer beware" to a more ethically nuanced "programmer be responsible." This represents a maturation from libertarian individualism toward a recognition of the programmer's responsibility to users and fellow developers.
+By making error handling a first-class concern, ual shifts from Forth's "programmer beware" to a more ethically nuanced "programmer be responsible." This represents a maturation from unrestrained individualism toward a recognition of the programmer's responsibility to users and fellow developers.
 
 #### Memory Efficiency as Environmental Ethics
 
@@ -458,7 +458,7 @@ These preserved elements represent not just surface similarities but the deeper 
 
 The journey from Forth to ual and other descendants illuminates how programming language philosophy evolves over time—not through wholesale replacement of ideas but through adaptation, extension, and recontextualization. This evolution encompasses not only technical aspects but ethical dimensions as well.
 
-ual stands as a particularly sophisticated example of this philosophical and ethical evolution—preserving the stack-based paradigm, directness, and resource consciousness of Forth while evolving its approach to context, types, relationships, and ethical responsibility. It represents a maturation from Forth's libertarian "freedom from constraints" toward a more nuanced vision of "freedom with responsibility"—a philosophical trajectory that parallels broader ethical developments in technology and society.
+ual stands as a particularly sophisticated example of this philosophical and ethical evolution—preserving the stack-based paradigm, directness, and resource consciousness of Forth while evolving its approach to context, types, relationships, and ethical responsibility. It represents a maturation from Forth's unrestrained "freedom from constraints" toward a more nuanced vision of "freedom with responsibility"—a philosophical trajectory that parallels broader ethical developments in technology and society.
 
 This ethical evolution is visible in ual's approach to:
 
