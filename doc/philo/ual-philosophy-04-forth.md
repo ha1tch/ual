@@ -38,6 +38,9 @@ Forth's approach emphasized extraordinary freedom coupled with extraordinary res
 
 This reflected Moore's philosophical position that competent programmers should not be constrained by arbitrary limitations.
 
+> Perhaps nowhere was Moore’s personal philosophy more in evidence than in his approach to data typing. Basically, he wanted to assume full responsibility for manipulating data objects in whatever way he wished. If pressed on this point, he would say, “If I want to add 1 to the letter A, it’s none of the compiler’s business to tell me I can’t.”
+https://www.forth.com/resources/forth-programming-language/#2.4.3.8
+
 ## ual's Philosophical Evolution
 
 ### From Implicit to Explicit Context
