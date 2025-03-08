@@ -231,13 +231,11 @@ ual is an evolving language with:
   - [Stack-Based Ownership System](https://github.com/ha1tch/ual/blob/main/spec/ual-1.5-PROPOSAL-ownership-system.md)
 
 ## License
-ual is available under the Apache 2.0 license.
-https://github.com/ha1tch/ual/blob/main/LICENSE
+    ual is available under the Apache 2.0 license.
+    https://github.com/ha1tch/ual/blob/main/LICENSE
 
 
 ## Author
-haitch  
-
-   email:  h (at) ual.fi
-  
-   Social: https://oldbytes.space/@haitchfive
+    haitch  
+    email:  h (at) ual.fi  
+    Social: https://oldbytes.space/@haitchfive
