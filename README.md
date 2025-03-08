@@ -232,9 +232,12 @@ ual is an evolving language with:
 
 ## License
 ual is available under the Apache 2.0 license.
+https://github.com/ha1tch/ual/blob/main/LICENSE
+
 
 ## Author
-
 haitch  
-haitch@duck.com  
-Social: https://oldbytes.space/@haitchfive
+
+   email:  h (at) ual.fi
+  
+   Social: https://oldbytes.space/@haitchfive
