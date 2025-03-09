@@ -1,6 +1,10 @@
 ual
 ├── LICENSE
 ├── README.md
+├── blog
+│   └── concurrent
+│       ├── concurrent-programming-01.md
+│       └── concurrent-programming-02.md
 ├── doc
 │   ├── philo
 │   │   ├── ual-philosophy-01-intro.md
@@ -37,8 +41,17 @@ ual
 │   ├── ual-1.4-PROPOSAL-macros.md
 │   ├── ual-1.4-PROPOSAL-typed-stacks-01.md
 │   ├── ual-1.4-PROPOSAL-typed-stacks-02.md
+│   ├── ual-1.5-PROPOSAL-JSON.md
+│   ├── ual-1.5-PROPOSAL-concurrency-model-01.md
+│   ├── ual-1.5-PROPOSAL-concurrency-model-02.md
 │   ├── ual-1.5-PROPOSAL-defer.md
-│   └── ual-1.5-PROPOSAL-ownership-system.md
+│   ├── ual-1.5-PROPOSAL-ownership-system.md
+│   ├── ual-1.5-PROPOSAL-pragmatic-genericity.md
+│   ├── ual-1.5-PROPOSAL-stack-perspectives.md
+│   ├── ual-1.5-PROPOSAL-syntax-refinements.md
+│   ├── ual-1.5-PROPOSAL-testing-01.md
+│   ├── ual-1.5-PROPOSAL-testing-02.md
+│   └── ual-1.5-PROPOSAL-testing-03.md
 └── ualc
     ├── build.sh
     ├── codegen.go
