@@ -10,7 +10,7 @@ This document proposes a concurrency model for the ual programming language that
 
 ### 1.1 Background
 
-Embedded systems increasingly employ multi-core processors or multi-processor architectures to improve performance while maintaining power efficiency. The ZX Interface project, with its potential for multiple ESP32 microcontrollers, exemplifies this trend toward distributed processing in constrained environments. However, programming such systems traditionally requires complex concurrency primitives that often feel foreign to the base language's paradigm.
+Embedded systems increasingly employ multi-core processors or multi-processor architectures to improve performance while maintaining power efficiency. However, programming such systems traditionally requires complex concurrency primitives that often feel foreign to the base language's paradigm.
 
 ### 1.2 Design Philosophy
 
@@ -87,7 +87,7 @@ Several concurrency models have been employed in resource-constrained systems, e
 
 ### 2.2 Why a New Approach is Needed
 
-None of these models fully aligns with ual's stack-based paradigm or optimally addresses the needs of distributed embedded systems like the ZX Interface with multiple ESP32s. Therefore, a new approach is proposed that:
+None of these models fully aligns with ual's stack-based paradigm or optimally addresses the needs of distributed embedded systems lwith multiple processors. Therefore, a new approach is proposed that:
 
 1. Builds naturally on ual's existing stack primitives
 2. Enables efficient communication between nodes without excessive overhead
@@ -480,9 +480,8 @@ The proposed concurrency model would work with ual's ownership system to manage 
 
 ## 7. Examples
 
-### 7.1 Image Processing on Multi-ESP32 ZX Interface
-
-This example demonstrates parallel image processing across multiple ESP32 nodes:
+### 7.1 Image Processing on Multiple Nodes
+This example demonstrates parallel image processing across multiple nodes:
 
 ```lua
 -- On coordinator node
@@ -822,6 +821,6 @@ Potential language extensions to enhance the concurrency model:
 
 The Stack-as-Channel concurrency model proposed for ual represents a natural extension of its existing paradigm to distributed computing environments. By leveraging stacks as the fundamental abstraction for both data storage and inter-process communication, this model maintains language consistency while enabling powerful concurrent programming patterns.
 
-This approach is particularly well-suited for resource-constrained embedded systems like the ZX Interface with multiple ESP32 processors, where efficiency, simplicity, and predictability are paramount. The model provides the necessary tools for building complex distributed applications without sacrificing the performance characteristics essential for embedded systems.
+This approach is particularly well-suited for resource-constrained embedded systems with multiple processors, where efficiency, simplicity, and predictability are paramount. The model provides the necessary tools for building complex distributed applications without sacrificing the performance characteristics essential for embedded systems.
 
 By building on ual's existing stack abstraction rather than introducing foreign concepts, this concurrency model creates a coherent programming experience that allows developers to apply their existing knowledge of the language to distributed computing problems. The result is a uniquely elegant approach to concurrency that aligns perfectly with ual's design philosophy while addressing the practical needs of modern multi-processor embedded systems.
