@@ -6,7 +6,7 @@ If you've worked with concurrency in languages like Go or Erlang, you're familia
 
 ual takes a different approach, leveraging its stack-based paradigm to create a unified concurrency model that feels natural within the language rather than being a separate subsystem. This document explores how ual's approach differs from traditional concurrency models and how it can simplify concurrent programming.
 
-## The Conceptual Shift: Containers as Communicators
+## A Conceptual Shift: Containers as Communicators
 
 ### Traditional Concurrency Models
 
