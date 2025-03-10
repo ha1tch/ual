@@ -1,6 +1,6 @@
 # ual 1.5 PROPOSAL: Integrated Testing System (Part 2)
 
-This is not part of the ual spec at this time. All documents marked as PROPOSAL are refinements and the version number indicates the version that the proposal is targeting to be integrated into the main ual spec in a forthcoming release.
+This is not part of the ual spec at this time. All documents marked as PROPOSAL are refinements and the version number indicates the proposal it's targeting to be integrated with into the main ual spec in a forthcoming release.
 
 This document extends the ual 1.5 Testing System PROPOSAL, introducing mocks, code coverage analysis, and structured test suites to create a robust, flexible, and explicit testing model in ual.
 
