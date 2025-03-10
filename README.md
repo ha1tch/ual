@@ -230,12 +230,24 @@ ual is an evolving language with:
 - **ual 1.5**: Future proposals
   - [Stack-Based Ownership System](https://github.com/ha1tch/ual/blob/main/spec/ual-1.5-PROPOSAL-ownership-system.md)
 
-## License
-ual is available under the Apache 2.0 license.
-- https://github.com/ha1tch/ual/blob/main/LICENSE
+## License  
+ual is available under the [Apache 2.0 license](https://github.com/ha1tch/ual/blob/main/LICENSE).
 
+---
+
+## Official ual Contact
+
+- **Email:** [info@ual.fi](mailto:info@ual.fi)
+- **Website:**  
+  - Main: [ual.fi](https://ual.fi) (under construction, ETA: Q2 2025)
+  - Spanish: [ual.uy](https://ual.uy) (en construcción, ETA: Q2 2025)
+- **Social Media (Spanish):** [Mastodon/Fediverse: @ual](https://mastodon.uy/@ual)
+
+---
 
 ## Author
-haitch  
-- email:  ```h (at) ual.fi```  
-- Social: https://oldbytes.space/@haitchfive
+
+- **Name:** haitch  
+- **Contact Options:**  
+  - For nuanced inquiries (may take time to reply): [h@ual.fi](mailto:h@ual.fi)  
+  - For quicker, broadcast-style updates: [oldbytes.space/@haitchfive](https://oldbytes.space/@haitchfive) 
