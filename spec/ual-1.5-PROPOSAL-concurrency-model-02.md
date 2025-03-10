@@ -6,7 +6,7 @@ This is not part of the ual spec at this time. All documents marked as PROPOSAL 
 
 ## 1. Introduction
 
-This document extends the "Stack Perspectives for Concurrency and Algorithms" proposal by detailing ual's comprehensive concurrency model. While Part 1 focused on stack perspectives for FIFO/LIFO behavior, this proposal explores the complete concurrency mechanism centered around the @spawn stack and concurrent task management.
+This document extends the [Stack-Based Concurrency Model](ual-1.5-PROPOSAL-concurrency-model-01) proposal, and depends on the [Stack Perspectives for Concurrency and Algorithms](ual-1.5-PROPOSAL-stack-perspectives) proposal by detailing ual's comprehensive concurrency model. While we previously focused on stack perspectives for FIFO/LIFO behavior, this proposal explores the complete concurrency mechanism centered around the @spawn stack and concurrent task management.
 
 The proposed concurrency model builds upon ual's container-centric philosophy to create a unified approach to concurrent programming where tasks, messaging, and synchronization are handled through specialized stacks with explicit operations.
 
