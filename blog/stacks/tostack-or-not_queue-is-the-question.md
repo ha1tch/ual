@@ -11,7 +11,7 @@ The division between different sequential data structures has evolved over decad
 
 ### Origins of the Stack
 
-The stack data structure was first formalized by Alan M. Turing in his 1936 paper "On Computable Numbers," where he described the concept of a "memory tape" for his abstract machine. However, the term "stack" and its explicit formalization for computer programming is generally attributed to German computer scientist Klaus Samelson and Friedrich L. Bauer, who filed a patent for the stack principle in 1957.
+Alan Turing’s 1936 paper, On Computable Numbers, laid the theoretical groundwork for modern computation by introducing the concept of a memory tape in his abstract Turing machine. While this work was foundational in shaping our understanding of computational processes, the specific data structure known as the stack—with its defined push and pop operations—was later formalized for practical programming use by Klaus Samelson and Friedrich L. Bauer, who, in 1957, patented what is now recognized as the stack principle.
 
 The stack became fundamental in computing when it was implemented in the Burroughs B5000 computer in the early 1960s, which used a hardware-supported stack architecture. This influenced many subsequent programming languages, particularly ALGOL, which prominently featured stack-based execution.
 
