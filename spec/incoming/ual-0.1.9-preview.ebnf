@@ -1,0 +1,254 @@
+(* ual 1.9 EBNF Grammar Specification *)
+
+(* 1. Overall Structure *)
+Program          ::= PackageDecl {ImportDecl} {TopLevelDecl} ;
+
+PackageDecl      ::= "package" Identifier ;
+
+ImportDecl       ::= "import" StringLiteral ;
+
+TopLevelDecl     ::= FunctionDef | GlobalVarDecl | EnumDecl ;
+
+(* 2. Lexical Elements *)
+Identifier       ::= Letter {Letter | Digit | "_"} ;
+
+Letter           ::= "A" | ... | "Z" | "a" | ... | "z" ;
+
+Digit            ::= "0" | ... | "9" ;
+
+(* Keywords - Not in formal EBNF but listed for reference *)
+(* "function", "end", "if_true", "if_false", "while_true", "return", "local", "do", "for", "in", "push", "pop", 
+   "dup", "swap", "add", "sub", "mul", "div", "store", "load", "import", "package", "drop", "over", "rot", 
+   "nrot", "nip", "tuck", "roll", "pick", "dup2", "drop2", "swap2", "over2", "depth", "len", "pushr", "popr", 
+   "peekr", "switch_case", "case", "default", "end_switch", "Stack", "enum", "scope", "defer_op" *)
+
+(* Literals *)
+Literal          ::= NumberLiteral | StringLiteral | BoolLiteral | NilLiteral ;
+
+NumberLiteral    ::= DecimalLiteral | BinaryLiteral | HexLiteral ;
+
+DecimalLiteral   ::= Digit {Digit} ;
+
+BinaryLiteral    ::= ("0b" | "0B") ("0" | "1")+ ;
+
+HexLiteral       ::= ("0x" | "0X") (Digit | "A" | ... | "F" | "a" | ... | "f")+ ;
+
+StringLiteral    ::= '"' {AnyCharExceptQuote | EscapeChar} '"'
+                   | "'" {AnyCharExceptQuote | EscapeChar} "'" ;
+
+BoolLiteral      ::= "true" | "false" ;
+
+NilLiteral       ::= "nil" ;
+
+(* Hash Literals *)
+HashLiteral      ::= "{" [KeyValuePair {"," KeyValuePair}] "}" ;
+
+KeyValuePair     ::= Expression "~" Expression ;
+
+(* Comments - Not in formal grammar but listed for reference *)
+Comment          ::= SingleLineComment | MultiLineComment ;
+
+SingleLineComment ::= ("--" | "//") {AnyCharExceptEOL} EOL ;
+
+MultiLineComment ::= "/*" {AnyCharExceptEndMarker} "*/" ;
+
+(* 3. Declarations *)
+(* 3.1 Function Definitions *)
+FunctionDef      ::= ["@error" ">"] "function" Identifier "(" [ParamList] ")" 
+                     (Block "end" | "{" Block "}") ;
+
+ParamList        ::= Param {"," Param} ;
+
+Param            ::= Identifier [":" Type] ;
+
+Type             ::= Identifier ["(" Type ")"] ;
+
+(* 3.2 Variable Declarations *)
+GlobalVarDecl    ::= Identifier "=" Expression ;
+
+LocalDecl        ::= "local" Identifier ["=" Expression] ;
+
+(* 3.3 Enum Declarations *)
+EnumDecl         ::= "enum" Identifier "{" EnumVariants "}" ;
+
+EnumVariants     ::= EnumVariant {"," EnumVariant} ;
+
+EnumVariant      ::= Identifier ["=" Expression] ;
+
+(* 4. Stack Operations *)
+(* 4.1 Stack Creation *)
+StackCreation    ::= "@" "Stack" "." "new" "(" Type ["," KeyType] ["," OwnershipMode] 
+                     ["," "PrimaryPerspective" ":" PerspectiveType] ")" 
+                     [":" "alias" ":" StringLiteral] ;
+
+KeyType          ::= "KeyType" ":" Type ;
+
+OwnershipMode    ::= "Owned" | "Borrowed" | "Mutable" ;
+
+PerspectiveType  ::= "LIFO" | "FIFO" | "MAXFO" | "MINFO" | "Hashed" ;
+
+(* 4.2 Stack Selection *)
+StackSelector    ::= "@" Identifier ":" 
+                   | "@" Identifier ">" 
+                   | ":"
+                   | ">" ;
+
+StackContextBlock ::= StackSelector "{" Block "}" ;
+
+(* 4.3 Stacked Mode *)
+StackedStmt      ::= StackSelector StackedOpList ;
+
+StackedOpList    ::= StackedOp {StackedOp} ;
+
+StackedOp        ::= Identifier [StackedParam]
+                   | Identifier "(" ExprList ")" ;
+
+StackedParam     ::= ":" Literal
+                   | "(" Expression ")" ;
+
+MultiStackStmt   ::= StackedStmt {";" StackedStmt} ;
+
+(* 4.4 Stack Perspectives *)
+PerspectiveOperation ::= StackSelector Perspective ;
+
+Perspective      ::= "lifo" | "fifo" | "maxfo" | "minfo" | "hashed" | "flip" ;
+
+(* 4.5 Ownership Operations *)
+BorrowOperation  ::= StackSelector "borrow" "(" RangeExpr "@" Identifier ")"
+                   | StackSelector "borrow_mut" "(" RangeExpr "@" Identifier ")" ;
+
+TakeOperation    ::= StackSelector "take" "(" Expression ")" ;
+
+BorrowShorthand  ::= StackSelector "<<" RangeExpr Identifier
+                   | StackSelector "<:mut" RangeExpr Identifier
+                   | StackSelector "<:own" Identifier ;
+
+RangeExpr        ::= "[" Expression ".." Expression "]"
+                   | "[" Expression {"," Expression} "]" ;
+
+(* 4.6 Crosstacks *)
+CrossstackSelector ::= Expression "~" Expression
+                     | "[" Expression ".." Expression "]" "~" Expression
+                     | "[" Expression {"," Expression} "]" "~" Expression
+                     | Expression "~" ;
+
+(* 5. Statements *)
+(* 5.1 Basic Statements *)
+Statement        ::= AssignmentStmt
+                   | StackStmt
+                   | IfTrueStmt
+                   | IfFalseStmt
+                   | WhileTrueStmt
+                   | ForNumStmt
+                   | ForGenStmt
+                   | ReturnStmt
+                   | FunctionCallStmt
+                   | LocalDecl
+                   | DoBlock
+                   | SwitchStmt
+                   | StackedStmt
+                   | DeferStmt
+                   | ScopeBlock
+                   | ConsiderBlock
+                   | Empty ;
+
+Block            ::= {Statement} ;
+
+AssignmentStmt   ::= VarList "=" ExprList ;
+
+VarList          ::= Variable {"," Variable} ;
+
+Variable         ::= Identifier
+                   | IndexAccess ;
+
+IndexAccess      ::= Expression "[" Expression "]"
+                   | Expression "." Identifier ;
+
+StackStmt        ::= StackOperation "(" [ExprList] ")"
+                   | StackOperationNoArgs ;
+
+FunctionCallStmt ::= Identifier "(" [ExprList] ")" ;
+
+ReturnStmt       ::= "return" [ExprList] ;
+
+(* 5.2 Control Structures *)
+IfTrueStmt       ::= "if_true" "(" Expression ")" 
+                     (Block ["end_if_true"] | "{" Block "}") ;
+
+IfFalseStmt      ::= "if_false" "(" Expression ")" 
+                     (Block ["end_if_false"] | "{" Block "}") ;
+
+WhileTrueStmt    ::= "while_true" "(" Expression ")" 
+                     (Block ["end_while_true"] | "{" Block "}") ;
+
+DoBlock          ::= "do" Block "end" ;
+
+ScopeBlock       ::= "scope" "{" Block "}" ;
+
+(* 5.3 For Loops *)
+ForNumStmt       ::= "for" Identifier "=" Expression "," Expression ["," Expression] 
+                     "do" Block "end" ;
+
+ForGenStmt       ::= "for" Identifier "in" Expression "do" Block "end" ;
+
+(* 5.4 Switch Statement *)
+SwitchStmt       ::= "switch_case" "(" Expression ")" CaseList 
+                     ["default" ":" Block] "end_switch" ;
+
+CaseList         ::= {CaseStmt} ;
+
+CaseStmt         ::= "case" CaseExpr ":" Block ;
+
+CaseExpr         ::= Expression
+                   | "[" ExprList "]" ;
+
+(* 5.5 Defer Statement *)
+DeferStmt        ::= "defer_op" "{" Block "}"
+                   | "@defer" ":" "push" "{" Block "}" ;
+
+(* 5.6 Consider Block *)
+ConsiderBlock    ::= Expression "." "consider" "{" PatternList "}" ;
+
+PatternList      ::= {PatternClause} ;
+
+PatternClause    ::= PatternType ["(" ExprList ")"] "{" Block "}" ;
+
+PatternType      ::= "if_ok" | "if_err" | "if_equal" | "if_match" | "if_type" | "if_else" ;
+
+(* 6. Expressions *)
+Expression       ::= Literal
+                   | Variable
+                   | FunctionCallExpr
+                   | "(" Expression ")"
+                   | BinaryOpExpr
+                   | TableConstructor
+                   | ArrayConstructor
+                   | StackCreationExpr
+                   | HashLiteral ;
+
+ExprList         ::= Expression {"," Expression} ;
+
+BinaryOpExpr     ::= Expression BinaryOp Expression ;
+
+BinaryOp         ::= "+" | "-" | "*" | "/" | "==" | "!=" | "<" | ">" | "<=" | ">="
+                   | "&" | "|" | "^" | "<<" | ">>" | "and" | "or" ;
+
+FunctionCallExpr ::= Identifier "(" [ExprList] ")" ;
+
+StackCreationExpr ::= "Stack" "." "new" "(" [Arguments] ")" ;
+
+(* 6.1 Table and Array Constructors *)
+TableConstructor ::= "{" [TableFieldList] "}" ;
+
+TableFieldList   ::= TableField {"," TableField} ;
+
+TableField       ::= KeyDef Expression ;
+
+KeyDef           ::= Identifier "="
+                   | "[" Expression "]" "="
+                   | Empty ;
+
+ArrayConstructor ::= "[" [ExprList] "]" ;
+
+(* Empty production *)
+Empty            ::= ;
