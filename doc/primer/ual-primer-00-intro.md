@@ -1,4 +1,3 @@
-I'll create a revised version that removes the reference to Backus, Naur, and Chomsky while maintaining the other improvements. Here's the updated text:
 
 # ual: A Hybrid Programming Paradigm
 
