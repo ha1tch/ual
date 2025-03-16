@@ -686,8 +686,11 @@ By focusing implementation efforts on these high-priority areas first, followed 
 
 This approach trades some implementation complexity for significant performance gains, making it suitable for systems where predictable high performance is critical, especially in domains like high-throughput databases, network routing systems, and large-scale caching infrastructure, as well as for implementing advanced language features like ual's crosstacks.
 
-**It's worth emphasizing that the Hybrid Adaptive Hash-Tree doesn't require choosing between simplicity and sophistication - its adaptivity is precisely what enables it to be simple when appropriate and sophisticated when beneficial. For small datasets or straightforward access patterns, the structure automatically simplifies by using only Levels 1 and 2 with the minimal "None" (000) option at Level 3, avoiding unnecessary complexity overhead. This built-in ability to scale both up and down in complexity is a fundamental feature of the design, providing optimal performance across a wide spectrum of use cases within a single unified framework. Rather than requiring developers to choose different data structures for different scenarios, the HA-HT adapts itself to match the requirements of the specific workload, dataset size, and access pattern.**
-## Implementation Strategy and Roadmap
+While no single data structure can be optimal for all scenarios –and save for exception of truly small data sets where we don't intend to use it– the Hybrid Adaptive Hash-Tree's greatest strength lies in its ability to adapt across the spectrum from simplicity to sophistication. Rather than forcing developers to choose between different structures for different workloads, the HA-HT seamlessly scales its complexity to match the specific requirements at hand. For small datasets or straightforward access patterns, it automatically simplifies by using only Levels 1 and 2 with the minimal "None" option at Level 3, avoiding unnecessary overhead. For complex scenarios, it leverages more sophisticated structures like Skip Lists, ART, or Orthogonal Lists. This built-in adaptivity enables the structure to deliver consistent performance across diverse workloads, dataset sizes, and hardware characteristics while maintaining a unified programming model. Implementers should still be mindful of the nuances described in this document, but can trust the structure to find the optimal balance between simplicity and power for each specific use case.
+
+---
+
+## Implementation Strategy and Future Roadmap
 
 The development of a Hybrid Adaptive Hash-Tree for crosstacks implementation should follow an incremental approach:
 
