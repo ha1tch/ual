@@ -1,0 +1,34 @@
+-- UAL Phase 4: For Iteration test
+
+-- Set up a stack with numbers
+@numbers = stack.new(i64)
+@numbers { push:10 push:20 push:30 push:40 push:50 }
+
+-- Basic for: each element pushed to @dstack, print it
+-- Default LIFO: 50, 40, 30, 20, 10
+@numbers for{ dot }
+
+-- For with named param
+@numbers for{|v|
+    push:v push:v mul dot   -- squares: 2500, 1600, 900, 400, 100
+}
+
+-- For with index and value (FIFO order)
+@numbers.fifo for{|i, v|
+    push:i dot   -- 0, 1, 2, 3, 4
+    push:v dot   -- 10, 20, 30, 40, 50
+}
+
+-- Sum using for
+var sum i64 = 0
+@numbers for{|v|
+    push:sum push:v add let:sum
+}
+push:sum dot   -- 150
+
+-- Count with while using for
+var count i64 = 0
+@numbers for{|v|
+    push:count inc let:count
+}
+push:count dot  -- 5

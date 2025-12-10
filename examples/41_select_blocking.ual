@@ -1,0 +1,31 @@
+-- 41: Blocking select - waits until data arrives
+-- Demonstrates blocking .select() without default case
+
+@inbox = stack.new(i64)
+@commands = stack.new(i64)
+
+-- Spawn a worker that pushes data after a delay
+@spawn < {
+    var i i64 = 0
+    while (i < 10000) {
+        push:i inc let:i
+    }
+    @inbox: push(42)
+}
+
+-- Start the worker
+@spawn pop play
+
+-- Blocking select: waits until inbox or commands has data
+@dstack {
+    -- setup (empty)
+}.select(
+    @inbox {|msg|
+        push:msg dot
+    }
+    @commands {|cmd|
+        push:cmd dot
+    }
+)
+
+push:999 dot

@@ -1,0 +1,39 @@
+-- 42: Select with per-case timeout
+-- Demonstrates timeout handling with retry
+
+@inbox = stack.new(i64)
+@commands = stack.new(i64)
+
+-- Counter for retry attempts
+var attempts i64 = 0
+
+-- Spawn worker that pushes after significant delay
+@spawn < {
+    var i i64 = 0
+    while (i < 500000) {
+        push:i inc let:i
+    }
+    @inbox: push(42)
+}
+
+-- Start the worker
+@spawn pop play
+
+-- Select with timeout on inbox
+@dstack {
+    push:1 dot  -- show we started
+}.select(
+    @inbox {|msg|
+        push:msg dot
+        timeout(50, {||
+            push:attempts inc let:attempts
+            push:attempts dot
+            retry()
+        })
+    }
+    @commands {|cmd|
+        push:cmd dot
+    }
+)
+
+push:999 dot

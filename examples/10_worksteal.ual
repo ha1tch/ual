@@ -1,0 +1,32 @@
+-- 10: Work Stealing simulation
+-- Shows the concept: owner takes from top, thief takes from bottom
+
+@tasks = stack.new(i64, cap: 100)
+
+-- Add 100 tasks: 0, 1, 2, ... 99
+var i i64 = 0
+while (i < 100) {
+    @tasks push:i
+    push:i inc let:i
+}
+
+var ownerWork i64 = 0
+var thiefWork i64 = 0
+
+-- LIFO iteration gives us elements in reverse order (99, 98, ... 0)
+-- Owner (LIFO) takes first 60 encountered = 99..40
+-- Thief (FIFO) takes last 40 encountered = 39..0
+var count i64 = 0
+@tasks for{|v|
+    if (count < 60) {
+        -- Owner takes top 60 (99, 98, ... 40)
+        push:ownerWork push:v add let:ownerWork
+    } else {
+        -- Thief takes bottom 40 (39, 38, ... 0)
+        push:thiefWork push:v add let:thiefWork
+    }
+    push:count inc let:count
+}
+
+push:ownerWork dot   -- Sum of 40..99 = 4170
+push:thiefWork dot   -- Sum of 0..39 = 780

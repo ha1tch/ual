@@ -1,0 +1,26 @@
+-- 08: Is Prime check - Count primes up to 500
+
+var primeCount i64 = 0
+var num i64 = 2
+
+while (num <= 500) {
+    var isPrime i64 = 1
+    var divisor i64 = 2
+    
+    while (divisor < num) {
+        push:num push:divisor mod let:remainder
+        if (remainder == 0) {
+            push:0 let:isPrime
+            break
+        }
+        push:divisor inc let:divisor
+    }
+    
+    if (isPrime > 0) {
+        push:primeCount inc let:primeCount
+    }
+    
+    push:num inc let:num
+}
+
+push:primeCount dot

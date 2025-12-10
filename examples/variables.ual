@@ -1,0 +1,31 @@
+-- UAL Phase 2: Variables test
+-- Variables are named slots on type stacks
+
+-- Simple declaration with value
+var x i64 = 42
+var y i64 = 10
+
+-- Use variables: push borrows from type stack to @dstack
+push:x dot           -- 42
+push:y dot           -- 10
+
+-- Arithmetic with variables
+push:x push:y add dot   -- 52
+push:x push:y mul dot   -- 420
+
+-- Multiple declarations
+var a, b i64 = 100, 200
+push:a dot           -- 100
+push:b dot           -- 200
+
+-- let assigns @dstack result to variable
+push:5 push:7 mul let:z
+push:z dot           -- 35
+
+-- Chained computation
+push:x push:y add let:sum
+push:sum dot         -- 52
+
+-- Type inference (infers i64 from integer literal)
+var n = 99
+push:n dot           -- 99

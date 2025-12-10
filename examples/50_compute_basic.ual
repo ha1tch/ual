@@ -1,0 +1,22 @@
+-- Basic compute block example
+-- Demonstrates zero-copy math with native types
+
+-- Declare an int64 stack  
+@math = stack.new(i64)
+
+-- Push some values (10 and 20)
+@math push(10)
+@math push(20)
+
+-- Compute block: pops 2 values, multiplies, pushes result
+@math {
+}.compute(
+    {|a, b|
+        var result = a * b
+        return result
+    }
+)
+
+-- Pop result to dstack and print (should be 200)
+@math pop
+print

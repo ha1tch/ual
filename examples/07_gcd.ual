@@ -1,0 +1,25 @@
+-- 07: GCD (Greatest Common Divisor) - Euclidean algorithm
+-- Compute GCD for 1000 pairs
+
+var total_gcd i64 = 0
+var i i64 = 1
+
+while (i <= 1000) {
+    -- Compute GCD of (i*17, i*13)
+    var gcd_a i64 = 0
+    var gcd_b i64 = 0
+    push:i push:17 mul let:gcd_a
+    push:i push:13 mul let:gcd_b
+    var temp i64 = 0
+    
+    while (gcd_b > 0) {
+        push:gcd_a push:gcd_b mod let:temp
+        push:gcd_b let:gcd_a
+        push:temp let:gcd_b
+    }
+    
+    push:total_gcd push:gcd_a add let:total_gcd
+    push:i inc let:i
+}
+
+push:total_gcd dot

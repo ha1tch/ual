@@ -1,0 +1,46 @@
+-- Compute with self.property access
+-- Demonstrates accessing container state in compute blocks
+
+-- Declare a Hash perspective float64 stack
+@body = stack.new(f64, Hash)
+
+-- Store named properties using set
+@body set("mass", 10.0)
+@body set("velocity", 5.0)
+@body set("factor", 0.5)
+
+-- Compute kinetic energy: KE = 0.5 * m * v^2
+-- For Hash stacks: use self.property access, no pop bindings
+@body {
+}.compute(
+    {||
+        var factor = self.factor
+        var m = self.mass
+        var v = self.velocity
+        var ke = factor * m * v * v
+        return ke
+    }
+)
+
+-- Result stored in __result_0__, access via self
+-- Verify by computing comparison
+@body set("expected", 125.0)
+
+@body {
+}.compute(
+    {||
+        var result = self.__result_0__
+        var expected = self.expected
+        if result == expected {
+            return 1.0
+        }
+        return 0.0
+    }
+)
+
+-- Check __result_0__ from comparison (should be 1.0)
+-- Use an i64 stack to print
+@verify = stack.new(i64)
+@verify push(1)
+@verify pop
+print

@@ -1,0 +1,211 @@
+-- UAL Algorithms: Basic examples
+-- Demonstrates common algorithms using UAL's stack-based approach
+
+------------------------------------------------------------
+-- Fibonacci: Generate first N fibonacci numbers
+------------------------------------------------------------
+var n i64 = 10
+var a i64 = 0
+var b i64 = 1
+
+@fib = stack.new(i64)
+@fib push:a   -- 0
+
+var i i64 = 1
+while (i < n) {
+    @fib push:b
+    push:a push:b add let:temp
+    push:b let:a
+    push:temp let:b
+    push:i inc let:i
+}
+var temp i64 = 0
+
+-- Print fibonacci sequence
+@fib.fifo for{|v| push:v dot }
+
+------------------------------------------------------------
+-- Factorial: n!
+------------------------------------------------------------
+var num i64 = 7
+var fact i64 = 1
+var j i64 = 1
+
+while (j <= num) {
+    push:fact push:j mul let:fact
+    push:j inc let:j
+}
+push:fact dot   -- 5040
+
+------------------------------------------------------------
+-- Sum, Min, Max reductions
+------------------------------------------------------------
+@data = stack.new(i64)
+@data { push:42 push:17 push:93 push:8 push:56 push:71 push:29 }
+
+-- Sum
+var total i64 = 0
+@data for{|v|
+    push:total push:v add let:total
+}
+push:total dot  -- 316
+
+-- Min
+var minimum i64 = 999999
+@data for{|v|
+    if (v < minimum) {
+        push:v let:minimum
+    }
+}
+push:minimum dot  -- 8
+
+-- Max
+var maximum i64 = 0
+@data for{|v|
+    if (v > maximum) {
+        push:v let:maximum
+    }
+}
+push:maximum dot  -- 93
+
+------------------------------------------------------------
+-- Linear Search: Find value in stack
+------------------------------------------------------------
+@haystack = stack.new(i64)
+@haystack { push:5 push:12 push:3 push:18 push:7 push:25 push:9 }
+
+var needle i64 = 18
+var found i64 = 0
+var position i64 = 0
+
+@haystack.fifo for{|idx, val|
+    if (val == needle) {
+        push:1 let:found
+        push:idx let:position
+    }
+}
+
+if (found > 0) {
+    push:position dot  -- 3 (0-indexed position of 18)
+} else {
+    push:999 dot       -- not found marker
+}
+
+------------------------------------------------------------
+-- Reverse a stack
+------------------------------------------------------------
+@original = stack.new(i64)
+@original { push:1 push:2 push:3 push:4 push:5 }
+
+@reversed = stack.new(i64)
+@original for{|v|
+    @reversed push:v
+}
+
+-- Print reversed: 5, 4, 3, 2, 1 (but LIFO makes it 1,2,3,4,5 on output)
+@reversed.fifo for{|v| push:v dot }
+
+------------------------------------------------------------
+-- Count elements matching condition
+------------------------------------------------------------
+@nums = stack.new(i64)
+@nums { push:10 push:25 push:30 push:15 push:45 push:20 push:35 }
+
+var countOver20 i64 = 0
+@nums for{|v|
+    if (v > 20) {
+        push:countOver20 inc let:countOver20
+    }
+}
+push:countOver20 dot  -- 4 (25, 30, 45, 35)
+
+------------------------------------------------------------
+-- Filter: Copy elements > threshold to new stack
+------------------------------------------------------------
+@source = stack.new(i64)
+@source { push:5 push:15 push:8 push:22 push:3 push:19 push:12 }
+
+@filtered = stack.new(i64)
+var threshold i64 = 10
+
+@source for{|v|
+    if (v > threshold) {
+        @filtered push:v
+    }
+}
+
+-- Print filtered (>10): 15, 22, 19, 12
+@filtered.fifo for{|v| push:v dot }
+
+------------------------------------------------------------
+-- Map: Double each element
+------------------------------------------------------------
+@input = stack.new(i64)
+@input { push:2 push:4 push:6 push:8 push:10 }
+
+@doubled = stack.new(i64)
+@input.fifo for{|v|
+    push:v push:2 mul
+    @doubled { pop }   -- pop from dstack, push to @doubled
+}
+
+-- Hmm, need a better way. Let's use let
+@input2 = stack.new(i64)
+@input2 { push:1 push:2 push:3 push:4 push:5 }
+
+@mapped = stack.new(i64)
+@input2.fifo for{|v|
+    push:v push:2 mul let:doubled2
+    @mapped push:doubled2
+}
+var doubled2 i64 = 0
+
+@mapped.fifo for{|v| push:v dot }  -- 2, 4, 6, 8, 10
+
+------------------------------------------------------------
+-- GCD (Greatest Common Divisor) - Euclidean algorithm
+------------------------------------------------------------
+var gcd_a i64 = 48
+var gcd_b i64 = 18
+
+while (gcd_b > 0) {
+    push:gcd_a push:gcd_b mod let:temp2
+    push:gcd_b let:gcd_a
+    push:temp2 let:gcd_b
+}
+var temp2 i64 = 0
+push:gcd_a dot  -- 6
+
+------------------------------------------------------------
+-- Is Prime check
+------------------------------------------------------------
+var checkNum i64 = 17
+var isPrime i64 = 1
+var divisor i64 = 2
+
+-- Simple trial division
+while (divisor < checkNum) {
+    push:checkNum push:divisor mod let:remainder
+    if (remainder == 0) {
+        push:0 let:isPrime
+        break
+    }
+    push:divisor inc let:divisor
+}
+var remainder i64 = 0
+
+push:isPrime dot  -- 1 (17 is prime)
+
+------------------------------------------------------------
+-- Power: base^exp
+------------------------------------------------------------
+var base i64 = 2
+var exp i64 = 10
+var result i64 = 1
+
+while (exp > 0) {
+    push:result push:base mul let:result
+    push:exp dec let:exp
+}
+
+push:result dot  -- 1024

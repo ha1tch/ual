@@ -1,0 +1,41 @@
+-- Functions with consider
+
+func safe_divide(a i64, b i64) i64 {
+    if (b == 0) {
+        status:error
+        return 0
+    }
+    status:ok
+    return a / b
+}
+
+-- Test successful division
+@dstack {
+    var result1 i64 = safe_divide(100, 5)
+    push:result1
+}.consider(
+    ok: {
+        dot
+    },
+    error: {
+        push:0
+        dot
+    }
+)
+
+-- Test division by zero
+@dstack {
+    var result2 i64 = safe_divide(100, 0)
+    push:result2
+}.consider(
+    ok: {
+        dot
+    },
+    error: {
+        push:999
+        dot
+    }
+)
+
+push:888
+dot

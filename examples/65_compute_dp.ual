@@ -1,0 +1,25 @@
+-- Test dynamic programming with local arrays
+-- Fibonacci via DP (bottom-up)
+@fib = stack.new(i64)
+@fib push(20)  -- compute fib(20)
+
+@fib {
+}.compute(
+    {|n|
+        var dp[100]
+        
+        dp[0] = 0
+        dp[1] = 1
+        
+        var i = 2
+        while i <= n {
+            dp[i] = dp[i - 1] + dp[i - 2]
+            i = i + 1
+        }
+        
+        return dp[n]
+    }
+)
+
+-- fib(20) = 6765
+@fib dot

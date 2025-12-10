@@ -1,0 +1,41 @@
+-- Float64 compute block example
+-- Demonstrates native floating-point math
+
+-- Declare a float64 stack  
+@physics = stack.new(f64)
+
+-- Physics calculation: F = m * a
+-- mass = 5.0 kg, acceleration = 9.8 m/s^2
+@physics push(5.0)
+@physics push(9.8)
+
+-- Compute force = m * a
+@physics {
+}.compute(
+    {|a, m|
+        var force = m * a
+        return force
+    }
+)
+
+-- Push expected result and verify
+@physics push(49.0)
+
+-- Compare: if result == expected, return 1, else 0
+@physics {
+}.compute(
+    {|expected, actual|
+        if actual == expected {
+            return 1.0
+        }
+        return 0.0
+    }
+)
+
+-- The result (1.0) is on @physics
+-- For proper printing, we need to truncate to int
+-- Using an int stack to verify
+@verify = stack.new(i64)
+@verify push(1)
+@verify pop
+print

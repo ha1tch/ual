@@ -1,0 +1,26 @@
+-- 05: Filter - Copy elements > threshold to new stack
+
+@source = stack.new(i64)
+
+-- Fill with 500 elements: i*7 % 100
+var k i64 = 0
+var val i64 = 0
+while (k < 500) {
+    push:k push:7 mul push:100 mod let:val
+    @source push:val
+    push:k inc let:k
+}
+
+@filtered = stack.new(i64)
+var threshold i64 = 50
+var count i64 = 0
+
+@source for{|v|
+    if (v > threshold) {
+        @filtered push:v
+        push:count inc let:count
+    }
+}
+
+-- Output count of filtered elements
+push:count dot

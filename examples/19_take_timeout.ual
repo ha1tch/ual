@@ -1,0 +1,25 @@
+-- 19: @stack take with timeout
+-- Demonstrates take with timeout for non-blocking wait
+
+@results = stack.new(i64)
+
+-- Try to take with short timeout (nothing there yet)
+push:1 dot
+
+-- This will timeout since nothing is pushed
+-- @results take(10)  -- 10ms timeout
+
+-- Push something
+@results < 42
+
+-- Now take will succeed immediately
+@results take
+let:result
+push:result dot
+
+push:999 dot
+
+-- Output:
+-- 1
+-- 42
+-- 999

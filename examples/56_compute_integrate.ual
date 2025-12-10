@@ -1,0 +1,64 @@
+-- Numerical integration using trapezoidal rule
+-- Integrates f(x) = x² from 0 to 1 (analytical result = 1/3 ≈ 0.333333)
+
+@integrate = stack.new(f64)
+
+-- Parameters: a=0, b=1, n=1000 intervals
+@integrate push(0.0)      -- a (lower bound)
+@integrate push(1.0)      -- b (upper bound)  
+@integrate push(1000.0)   -- n (number of intervals)
+
+@integrate {
+}.compute(
+    {|n, b, a|
+        var h = (b - a) / n
+        var sum = 0.0
+        var x = a
+        var i = 0.0
+        
+        -- f(a)/2
+        var fa = a * a
+        sum = fa / 2.0
+        
+        -- Sum f(x_i) for i = 1 to n-1
+        i = 1.0
+        while i < n {
+            x = a + i * h
+            var fx = x * x
+            sum = sum + fx
+            i = i + 1.0
+        }
+        
+        -- f(b)/2
+        var fb = b * b
+        sum = sum + fb / 2.0
+        
+        -- Multiply by h
+        var result = h * sum
+        return result
+    }
+)
+
+-- Verify result ≈ 0.333333
+@integrate push(0.333333)
+
+@integrate {
+}.compute(
+    {|expected, actual|
+        var diff = actual - expected
+        if diff < 0.0 {
+            diff = 0.0 - diff
+        }
+        
+        -- Check within 0.001 tolerance
+        if diff < 0.001 {
+            return 1.0
+        }
+        return 0.0
+    }
+)
+
+@out = stack.new(i64)
+@out push(1)
+@out pop
+print

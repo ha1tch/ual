@@ -1,0 +1,45 @@
+-- 20: Direct pop/take to variable
+-- Tests pop:var and take:var syntax
+
+@inbox = stack.new(i64)
+@inbox < 100
+@inbox < 200
+@inbox < 300
+
+var msg i64 = 0
+
+-- pop:var — direct assignment (new way)
+@inbox pop:msg
+push:msg dot   -- 300
+
+@inbox pop:msg
+push:msg dot   -- 200
+
+-- pop:var for last one
+@inbox pop:msg
+push:msg dot   -- 100
+
+-- take:var with spawned producer
+@jobs = stack.new(i64)
+
+@spawn < {
+    var i i64 = 0
+    while (i < 10000) {
+        push:i inc let:i
+    }
+    @jobs < 42
+}
+@spawn pop play
+
+var task i64 = 0
+@jobs take:task   -- blocks until 42 arrives
+push:task dot     -- 42
+
+push:999 dot
+
+-- Expected output:
+-- 300
+-- 200
+-- 100
+-- 42
+-- 999

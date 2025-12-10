@@ -1,0 +1,28 @@
+-- 18: @stack take — blocking pop
+-- Demonstrates synchronization with take
+
+@results = stack.new(i64)
+
+-- Spawn a worker that will push after a delay
+@spawn < {
+    -- Simulate work
+    var i i64 = 0
+    while (i < 100000) {
+        push:i inc let:i
+    }
+    @results < 42
+}
+
+-- Start the worker
+@spawn pop play
+
+-- Block until result arrives
+push:1 dot
+var result i64 = 0
+@results take    -- blocks, pushes to dstack
+let:result       -- pops from dstack
+push:result dot
+
+-- Output should be:
+-- 1
+-- 42

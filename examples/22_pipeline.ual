@@ -1,0 +1,64 @@
+-- 22: Pipeline - Producer -> Transformer -> Consumer
+-- Demonstrates concurrent pipeline with FIFO queues
+
+@raw = stack.new(i64)
+@raw perspective(FIFO)
+
+@products = stack.new(i64)
+@products perspective(FIFO)
+
+@done = stack.new(i64)
+
+-- Producer: generates raw numbers 1..10
+@spawn < {
+    var i i64 = 1
+    while (i <= 10) {
+        @raw < i
+        push:i inc let:i
+    }
+    @raw < 0   -- sentinel: signals end
+}
+
+-- Transformer: raw * 2 -> products
+@spawn < {
+    var n i64 = 1
+    @raw take:n
+    while (n != 0) {
+        @products < (n * 2)
+        @raw take:n
+    }
+    @products < 0  -- pass sentinel downstream
+}
+
+-- Consumer: prints products
+@spawn < {
+    var p i64 = 1
+    @products take:p
+    while (p != 0) {
+        push:p dot
+        @products take:p
+    }
+    @done < 1  -- signal completion
+}
+
+-- Start all three workers
+@spawn pop play pop play pop play
+
+-- Wait for pipeline to complete
+var result i64 = 0
+@done take:result
+
+push:0 dot  -- show main finished
+
+-- Expected output:
+-- 2
+-- 4
+-- 6
+-- 8
+-- 10
+-- 12
+-- 14
+-- 16
+-- 18
+-- 20
+-- 0

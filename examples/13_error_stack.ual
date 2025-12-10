@@ -1,0 +1,54 @@
+-- 13: Application-level error handling with @error stack
+-- Unlike panic (which unwinds), @error is for recoverable errors
+
+-- Push some errors
+@error < "first error"
+@error < "second error"
+
+-- Check if errors exist
+@error: has              -- pushes true to @bool
+-- We can't easily print bool yet, so let's check with length
+
+-- For now, let's demonstrate the pattern
+-- After an operation that might fail:
+
+var result i64 = 0
+var numerator i64 = 100
+var denominator i64 = 0
+
+-- Manual division with error check
+if (denominator == 0) {
+    @error < "division by zero"
+    push:0 let:result
+} else {
+    push:numerator push:denominator div let:result
+}
+
+-- Check if there was an error and handle it
+-- In a real program, we'd check @error.has and handle
+
+-- Clear all errors
+@error: clear
+
+-- Now do a valid operation
+push:5 let:denominator
+if (denominator == 0) {
+    @error < "division by zero"
+    push:0 let:result
+} else {
+    push:numerator push:denominator div let:result
+}
+
+-- Print result (should be 20)
+push:result dot
+
+-- Demonstrate error stack LIFO behavior
+@error < "error A"
+@error < "error B"
+@error < "error C"
+
+-- Pop and print (would print C, B, A if we had string printing)
+-- For now just clear them
+@error: clear
+
+push:999 dot  -- marker: completed successfully

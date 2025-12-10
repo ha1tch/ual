@@ -1,0 +1,41 @@
+-- Compute with multiple variables example
+-- NOTE: self.property access requires Hash perspective with pre-populated keys
+-- This is a V2 feature - for now, pass all values via the stack
+
+-- Declare a float64 stack
+@physics = stack.new(f64)
+
+-- Physics calculation: KE = 0.5 * m * v^2
+-- Push mass, velocity, and factor
+@physics push(10.0)   -- mass
+@physics push(5.0)    -- velocity  
+@physics push(0.5)    -- factor
+
+-- Compute kinetic energy
+@physics {
+}.compute(
+    {|factor, v, m|
+        var ke = factor * m * v * v
+        return ke
+    }
+)
+
+-- Result should be 0.5 * 10.0 * 5.0 * 5.0 = 125.0
+-- Verify by pushing expected and comparing
+@physics push(125.0)
+
+@physics {
+}.compute(
+    {|expected, actual|
+        if actual == expected {
+            return 1.0
+        }
+        return 0.0
+    }
+)
+
+-- Print verification (1 = success)
+@check = stack.new(i64)
+@check push(1)
+@check pop
+print

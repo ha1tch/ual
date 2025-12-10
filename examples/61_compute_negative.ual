@@ -1,0 +1,17 @@
+-- Test negative literals in compute blocks
+@nums = stack.new(f64)
+@nums push(10.0)
+
+@nums {
+}.compute(
+    {|x|
+        var a = -5.0
+        var b = -x
+        var c = a * b
+        return c
+    }
+)
+
+-- Expected: -5.0 * -10.0 = 50.0
+-- Print directly from the f64 stack
+@nums dot

@@ -1,0 +1,22 @@
+-- 09: Power - Compute base^exp for multiple values
+
+var totalPow i64 = 0
+var i i64 = 1
+
+while (i <= 100) {
+    -- Compute 2^(i % 20)
+    var base i64 = 2
+    var exp i64 = 0
+    push:i push:20 mod let:exp
+    var result i64 = 1
+    
+    while (exp > 0) {
+        push:result push:base mul let:result
+        push:exp dec let:exp
+    }
+    
+    push:totalPow push:result add let:totalPow
+    push:i inc let:i
+}
+
+push:totalPow dot

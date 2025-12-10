@@ -1,0 +1,26 @@
+-- Default stacks example
+-- @dstack, @rstack, and @error are available by default
+
+-- Implicit @dstack usage (no stack reference needed)
+push:10
+push:20
+push:30
+print       -- prints 30 (peek, non-destructive)
+dot         -- prints 30 and pops
+dot         -- prints 20 and pops
+
+-- Explicit @dstack usage (same thing)
+@dstack push:100
+@dstack push:200
+@dstack: print()
+
+-- Return stack operations
+push:42
+tor         -- move 42 to @rstack
+push:99
+fromr       -- move 42 back from @rstack
+dot         -- prints 42
+dot         -- prints 99
+
+-- Calculate something
+push:5 push:3 add print  -- prints 8

@@ -1,0 +1,15 @@
+-- Test get operation for Hash perspective
+-- Demonstrates symmetric set/get outside compute blocks
+
+@config = stack.new(i64, Hash)
+
+-- Set some values
+@config set("width", 800)
+@config set("height", 600)
+@config set("depth", 32)
+
+-- Get a value and push to dstack
+@config get("width")
+
+-- Should print 800
+print

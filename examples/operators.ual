@@ -1,0 +1,27 @@
+-- Phase 1: Operators test
+
+-- Unary operations
+push:10 neg dot           -- -10
+push:5 neg abs dot        -- 5 (abs of -5)
+push:10 inc dot           -- 11
+push:10 dec dot           -- 9
+
+-- Min/Max
+push:3 push:7 min dot     -- 3
+push:3 push:7 max dot     -- 7
+
+-- Bitwise
+push:5 push:3 band dot    -- 1 (101 & 011 = 001)
+push:5 push:3 bor dot     -- 7 (101 | 011 = 111)
+push:5 push:3 bxor dot    -- 6 (101 ^ 011 = 110)
+push:5 bnot dot           -- -6 (^5)
+push:1 push:3 shl dot     -- 8 (1 << 3)
+push:16 push:2 shr dot    -- 4 (16 >> 2)
+
+-- Comparisons (results go to @bool)
+push:5 push:3 gt          -- true → @bool
+push:5 push:5 eq          -- true → @bool
+push:3 push:5 lt          -- true → @bool
+push:5 push:3 le          -- false → @bool
+push:5 push:5 ge          -- true → @bool
+push:5 push:3 ne          -- true → @bool

@@ -1,0 +1,16 @@
+-- 21: take with timeout to variable
+
+@data = stack.new(i64)
+@data < 42
+
+var result i64 = 0
+
+-- take(timeout):var syntax
+@data take(1000):result   -- 1 second timeout
+push:result dot           -- 42
+
+push:999 dot
+
+-- Expected:
+-- 42
+-- 999

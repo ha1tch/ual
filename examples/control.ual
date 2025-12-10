@@ -1,0 +1,68 @@
+-- UAL Phase 3: Control Flow test
+
+-- Simple if
+var x i64 = 10
+
+if (x > 5) {
+    push:100 dot
+}
+
+-- if/else
+var y i64 = 3
+
+if (y > 5) {
+    push:200 dot
+} else {
+    push:300 dot
+}
+
+-- if/elseif/else
+var z i64 = 50
+
+if (z > 100) {
+    push:1 dot
+} elseif (z > 50) {
+    push:2 dot
+} elseif (z == 50) {
+    push:3 dot
+} else {
+    push:4 dot
+}
+
+-- while loop
+var count i64 = 5
+while (count > 0) {
+    push:count dot
+    push:count dec let:count
+}
+
+-- nested if inside while
+var n i64 = 3
+while (n > 0) {
+    if (n == 2) {
+        push:999 dot
+    } else {
+        push:n dot
+    }
+    push:n dec let:n
+}
+
+-- break test
+var i i64 = 10
+while (i > 0) {
+    push:i dot
+    if (i == 7) {
+        break
+    }
+    push:i dec let:i
+}
+
+-- continue test
+var j i64 = 5
+while (j > 0) {
+    push:j dec let:j
+    if (j == 2) {
+        continue
+    }
+    push:j dot
+}

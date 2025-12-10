@@ -1,0 +1,29 @@
+-- Test status: statement within consider block
+
+@dstack {
+    push:100
+    
+    -- Set status explicitly
+    status:custom
+    
+    push:42
+}.consider(
+    ok: {
+        push:0
+        dot
+    },
+    custom: {
+        push:1
+        dot
+        dot
+    },
+    _: {
+        push:0
+        push:1
+        sub
+        dot
+    }
+)
+
+push:999
+dot

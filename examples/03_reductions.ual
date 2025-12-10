@@ -1,0 +1,38 @@
+-- 03: Sum, Min, Max reductions over 1000 elements
+
+@data = stack.new(i64)
+
+-- Fill with values: 1, 4, 9, 16, ... (i*i % 100)
+var k i64 = 0
+var val i64 = 0
+while (k < 1000) {
+    push:k push:k mul push:100 mod let:val
+    @data push:val
+    push:k inc let:k
+}
+
+-- Sum
+var total i64 = 0
+@data for{|v|
+    push:total push:v add let:total
+}
+
+-- Min
+var minimum i64 = 999999
+@data for{|v|
+    if (v < minimum) {
+        push:v let:minimum
+    }
+}
+
+-- Max
+var maximum i64 = 0
+@data for{|v|
+    if (v > maximum) {
+        push:v let:maximum
+    }
+}
+
+push:total dot
+push:minimum dot
+push:maximum dot

@@ -1,0 +1,27 @@
+-- 04: Linear Search - Find value in stack (1000 elements)
+
+@haystack = stack.new(i64)
+
+-- Fill with values 0..999
+var k i64 = 0
+while (k < 1000) {
+    @haystack push:k
+    push:k inc let:k
+}
+
+var needle i64 = 777
+var found i64 = 0
+var position i64 = 0
+
+@haystack.fifo for{|idx, val|
+    if (val == needle) {
+        push:1 let:found
+        push:idx let:position
+    }
+}
+
+if (found > 0) {
+    push:position dot
+} else {
+    push:999 dot
+}

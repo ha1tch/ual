@@ -1,0 +1,89 @@
+-- 14: Go-style error handling pattern
+-- Demonstrates the separation: errors vs panic vs @defer
+
+-- ============================================
+-- PATTERN 1: Errors for recoverable situations
+-- ============================================
+-- @error stack holds application-level errors
+-- Caller decides whether to check and how to handle
+
+func safeDivide(a i64, b i64) i64 {
+    if (b == 0) {
+        @error < "division by zero"
+        return 0
+    }
+    return a / b
+}
+
+-- Use the function
+var x i64 = safeDivide(100, 5)
+push:x dot                         -- 20
+
+var y i64 = safeDivide(100, 0)     -- Sets @error
+push:y dot                         -- 0 (sentinel value)
+
+-- Check for error
+@error: has                        -- Pushes to @bool
+@error: clear                      -- Clear after handling
+
+var z i64 = safeDivide(50, 2)
+push:z dot                         -- 25
+
+-- ============================================
+-- PATTERN 2: Panic for unrecoverable situations
+-- ============================================
+-- Things that "should never happen"
+-- Program bugs, corrupted state, etc.
+
+func mustBePositive(n i64) i64 {
+    if (n <= 0) {
+        panic:"value must be positive"
+    }
+    return n
+}
+
+-- This would panic if uncommented:
+-- var bad i64 = mustBePositive(0 - 5)
+
+var good i64 = mustBePositive(42)
+push:good dot                      -- 42
+
+-- ============================================
+-- PATTERN 3: Try/catch for panic recovery
+-- ============================================
+-- When you need to recover from panic
+-- (e.g., handling untrusted input)
+
+var negVal i64 = 0 - 10
+
+try {
+    var result i64 = mustBePositive(negVal)
+    push:result dot                -- Won't reach
+} catch |err| {
+    push:0 dot                     -- 0: panic caught
+}
+
+-- ============================================
+-- PATTERN 4: Defer for cleanup
+-- ============================================
+-- Always runs, LIFO order, like Go
+
+func processWithCleanup() i64 {
+    @defer < { push:777 dot }         -- Cleanup marker
+    
+    var value i64 = 100
+    push:value
+    push:50
+    add
+    let:value
+    
+    return value
+}
+
+var final i64 = processWithCleanup()
+push:final dot                     -- 150 (777 printed during return)
+
+-- ============================================
+-- Summary marker
+-- ============================================
+push:888 dot

@@ -1,0 +1,65 @@
+-- UAL Phase 5: Functions test
+
+-- Simple function with no params, no return
+func greet() {
+    push:42 dot
+}
+
+-- Function with parameters (no return)
+func showSum(a i64, b i64) {
+    push:a push:b add dot
+}
+
+-- Function with return type
+func sum(a i64, b i64) i64 {
+    push:a push:b add let:result
+    var result i64 = 0
+    return result
+}
+
+-- Function with single param and return
+func square(n i64) i64 {
+    push:n push:n mul let:sq
+    var sq i64 = 0
+    return sq
+}
+
+-- Factorial using loop
+func factorial(n i64) i64 {
+    var result i64 = 1
+    var i i64 = 1
+    while (i <= n) {
+        push:result push:i mul let:result
+        push:i inc let:i
+    }
+    return result
+}
+
+-- Function for shorthand demo
+func double(n i64) i64 {
+    push:n push:2 mul let:r
+    var r i64 = 0
+    return r
+}
+
+-- Main program
+greet()
+
+showSum(10, 20)
+
+var s i64 = sum(100, 200)
+push:s dot
+
+var sq i64 = square(7)
+push:sq dot
+
+var f5 i64 = factorial(5)
+push:f5 dot
+
+-- Shorthand syntax for single-param functions
+var d1 i64 = double:10
+push:d1 dot
+
+-- Chained shorthand
+var d2 i64 = double:double:3
+push:d2 dot

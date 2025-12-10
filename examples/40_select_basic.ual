@@ -1,0 +1,26 @@
+-- 40: Basic select - concurrent wait on multiple stacks
+-- Demonstrates the .select() construct
+
+@inbox = stack.new(i64)
+@commands = stack.new(i64)
+
+-- Push some data to inbox first
+@inbox: push(42)
+
+-- Select waits on multiple stacks, first with data wins
+@inbox {
+    -- setup block (runs before waiting)
+    push:1 dot
+}.select(
+    @inbox {|msg|
+        push:msg dot
+    }
+    @commands {|cmd|
+        push:cmd dot
+    }
+    _: {
+        push:0 dot
+    }
+)
+
+push:999 dot

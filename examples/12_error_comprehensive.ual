@@ -1,0 +1,97 @@
+-- 12: Comprehensive error handling
+-- Demonstrates: @defer, panic/recover, @error stack
+
+-- ============================================
+-- Part 1: @defer for cleanup
+-- ============================================
+
+var resource i64 = 0
+
+-- Simulating resource acquisition
+push:1 let:resource
+
+@defer < {
+    -- This will run when main exits
+    push:0 let:resource   -- "release" the resource
+    push:888 dot          -- marker: cleanup ran
+}
+
+push:resource dot         -- Should print 1
+
+-- Multiple defers run LIFO
+@defer < { push:111 dot }
+@defer < { push:222 dot }
+@defer < { push:333 dot }
+
+-- ============================================
+-- Part 2: Panic/Recover for unrecoverable errors
+-- ============================================
+
+-- Try block catches panic
+try {
+    push:42 dot
+    
+    -- Simulate an unrecoverable error
+    var shouldFail i64 = 1
+    if (shouldFail > 0) {
+        panic:"critical failure"
+    }
+    
+    push:99 dot  -- Never reached
+} catch |err| {
+    push:0 dot   -- Error handler ran
+}
+
+push:100 dot     -- Execution continues
+
+-- ============================================
+-- Part 3: Try with finally
+-- ============================================
+
+try {
+    push:500 dot
+} catch {
+    push:501 dot   -- Won't run, no panic
+} finally {
+    push:502 dot   -- Always runs
+}
+
+-- ============================================
+-- Part 4: Nested try/catch
+-- ============================================
+
+try {
+    push:600 dot
+    
+    try {
+        push:601 dot
+        panic:"inner panic"
+        push:602 dot   -- Never reached
+    } catch {
+        push:603 dot   -- Inner catch
+        -- Don't re-panic, so outer continues
+    }
+    
+    push:604 dot       -- Reached because inner catch handled it
+} catch {
+    push:605 dot       -- Not reached
+}
+
+push:700 dot           -- Final marker
+
+-- Expected output (in order):
+-- 1        (resource acquired)
+-- 42       (try block start)
+-- 0        (panic caught)
+-- 100      (after first try/catch)
+-- 500      (second try block)
+-- 502      (finally always runs)
+-- 600      (outer try)
+-- 601      (inner try)
+-- 603      (inner catch)
+-- 604      (outer try continues)
+-- 700      (final marker)
+-- 333      (defer LIFO)
+-- 222      (defer LIFO)
+-- 111      (defer LIFO)
+-- 888      (cleanup defer)

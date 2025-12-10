@@ -1,0 +1,16 @@
+-- Test math function auto-prefixing in compute blocks
+@nums = stack.new(f64)
+@nums push(2.0)
+
+@nums {
+}.compute(
+    {|x|
+        var root = sqrt(x)
+        var squared = pow(root, 2.0)
+        var diff = abs(squared - x)
+        return diff
+    }
+)
+
+-- Should be ~0 (sqrt(2)^2 - 2 ≈ 0)
+@nums dot

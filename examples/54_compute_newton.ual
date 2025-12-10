@@ -1,0 +1,65 @@
+-- Newton-Raphson square root approximation
+-- Demonstrates iterative computation with while loops inside compute blocks
+
+@calc = stack.new(f64)
+
+-- Push the number we want the square root of
+@calc push(2.0)
+
+-- Newton-Raphson: x_{n+1} = 0.5 * (x_n + S/x_n)
+-- Starting guess: S/2
+@calc {
+}.compute(
+    {|S|
+        var x = S / 2.0
+        var prev = 0.0
+        var diff = 1.0
+        var epsilon = 0.0000001
+        var half = 0.5
+        var iterations = 0.0
+        
+        -- Iterate until convergence
+        while diff > epsilon {
+            prev = x
+            x = half * (x + S / x)
+            
+            -- Compute absolute difference
+            diff = x - prev
+            if diff < 0.0 {
+                diff = 0.0 - diff
+            }
+            iterations = iterations + 1.0
+        }
+        
+        -- Return both the result and iteration count
+        return x, iterations
+    }
+)
+
+-- Stack now has: [iterations (top), sqrt(2) (second)]
+-- Pop iteration count first
+@calc {
+}.compute(
+    {|iters, result|
+        -- Verify sqrt(2) ≈ 1.41421356...
+        var expected = 1.41421356
+        var diff = result - expected
+        if diff < 0.0 {
+            diff = 0.0 - diff
+        }
+        
+        -- Check if within tolerance and converged reasonably fast
+        if diff < 0.0001 {
+            if iters < 20.0 {
+                return 1.0
+            }
+        }
+        return 0.0
+    }
+)
+
+-- Print verification
+@out = stack.new(i64)
+@out push(1)
+@out pop
+print

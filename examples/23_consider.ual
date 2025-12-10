@@ -1,0 +1,85 @@
+-- Example: consider() construct
+-- Demonstrates status matching on block outcomes
+
+-- Basic consider with ok/error cases
+@dstack {
+    push:42
+    push:10
+    add
+    dot
+}.consider(
+    ok: print("Operation succeeded")
+    error |e|: print("Error: " + e)
+)
+
+-- Using explicit status:label to set outcome
+func divide(a i64, b i64) i64 {
+    if (b == 0) {
+        status:error("division by zero")
+        return 0
+    }
+    return a / b
+}
+
+@dstack {
+    var result i64 = divide(100, 0)
+    push:result
+}.consider(
+    ok: {
+        print("Division result:")
+        dot
+    }
+    error |msg|: {
+        print("Division failed:")
+        print(msg)
+    }
+)
+
+-- Consider with multiple custom status labels
+func validate_age(age i64) i64 {
+    if (age < 0) {
+        status:invalid("age cannot be negative")
+        return 0
+    }
+    if (age < 18) {
+        status:minor(age)
+        return age
+    }
+    if (age > 120) {
+        status:invalid("age too high")
+        return 0
+    }
+    status:ok
+    return age
+}
+
+@dstack {
+    var age i64 = validate_age(15)
+    push:age
+}.consider(
+    ok: print("Valid adult age")
+    minor |age|: print("Minor detected")
+    invalid |reason|: print("Invalid: " + reason)
+    _: print("Unknown status")
+)
+
+-- Nested consider blocks
+@dstack {
+    push:100
+    
+    @dstack {
+        push:50
+        status:partial
+    }.consider(
+        ok: print("Inner ok")
+        partial: print("Inner partial")
+        _: print("Inner unknown")
+    )
+    
+    dot
+}.consider(
+    ok: print("Outer completed")
+    _: print("Outer issue")
+)
+
+print("Consider examples complete")

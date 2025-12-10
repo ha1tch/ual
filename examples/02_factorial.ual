@@ -1,0 +1,12 @@
+-- 02: Factorial - Compute n!
+
+var num i64 = 12
+var fact i64 = 1
+var j i64 = 1
+
+while (j <= num) {
+    push:fact push:j mul let:fact
+    push:j inc let:j
+}
+
+push:fact dot

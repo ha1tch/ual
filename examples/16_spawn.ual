@@ -1,0 +1,28 @@
+-- 16: @spawn concurrency
+-- Demonstrates goroutine spawning with shared stacks
+
+@results = stack.new(i64)
+
+-- Queue some tasks
+@spawn < {
+    @results < 100
+}
+
+@spawn < {
+    @results < 200
+}
+
+@spawn < {
+    @results < 300
+}
+
+-- Start all tasks concurrently
+@spawn pop play
+@spawn pop play
+@spawn pop play
+
+-- Check results
+push:777 dot
+
+-- Note: Goroutines may not complete before main exits
+-- In production, use take() for synchronization

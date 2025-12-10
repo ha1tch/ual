@@ -1,0 +1,27 @@
+-- Test @defer, panic, try/catch
+
+-- Simple defer test
+var x i64 = 10
+@defer < {
+    push:999 dot
+}
+
+push:x dot
+
+-- Defer runs in LIFO order
+@defer < { push:1 dot }
+@defer < { push:2 dot }
+@defer < { push:3 dot }
+
+push:100 dot
+
+-- Try/catch test
+try {
+    push:42 dot
+    panic:"something went wrong"
+    push:99 dot  -- should not execute
+} catch |err| {
+    push:0 dot   -- error handled
+}
+
+push:200 dot

@@ -1,0 +1,20 @@
+-- 15: @defer stack demonstration
+-- The @defer stack holds code blocks executed LIFO on scope exit
+
+-- Push cleanup blocks to @defer stack
+@defer < { push:1 dot }   -- Executes last
+@defer < { push:2 dot }   -- Executes second
+@defer < { push:3 dot }   -- Executes first
+
+-- Normal execution
+push:100 dot
+push:200 dot
+push:300 dot
+
+-- Output will be:
+-- 100
+-- 200
+-- 300
+-- 3    (LIFO: last defer pushed)
+-- 2
+-- 1    (LIFO: first defer pushed)

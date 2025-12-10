@@ -1,0 +1,19 @@
+-- Test value bindings in consider
+
+-- Test 1: Binding a status value
+@dstack {
+    push:42
+    status:result(123)
+}.consider(
+    ok: push:0,
+    result |val|: {
+        -- val should be 123
+        push:val
+        dot
+    },
+    _: push:999
+)
+
+-- Done
+push:777
+dot

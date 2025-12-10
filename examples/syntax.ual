@@ -1,0 +1,32 @@
+-- ual example with new syntax features
+-- Lua-style comments work now
+
+// Go-style comments still work too
+
+/* And block
+   comments */
+
+-- Stack declaration
+@numbers = stack.new(i64)
+
+-- Block syntax: multiple operations in a block
+@numbers {
+    push:10
+    push:20
+    push:30
+}
+
+-- Multiple operations on one line (Forth-style)
+@calc = stack.new(i64)
+@calc push:5 push:3 add
+@calc push:10 mul
+
+-- The result should be (5 + 3) * 10 = 80
+result = @calc: pop()
+
+-- Using reduce with the original syntax still works
+@numbers = stack.new(i64)
+@numbers: push(100)
+@numbers: push(200)
+@numbers: push(300)
+sum = @numbers: reduce(0, {|a, b| a + b })

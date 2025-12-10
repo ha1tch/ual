@@ -1,0 +1,91 @@
+-- UAL Consider Construct
+-- =======================
+-- 
+-- The .consider() construct provides structured error handling
+-- with pattern matching on status outcomes.
+--
+-- Syntax:
+--   @stack { operations }.consider(
+--       label: handler,
+--       label |binding|: handler,
+--       _: default_handler
+--   )
+--
+-- Features:
+-- - Block execution with status tracking
+-- - Explicit status setting via status:label or status:label(value)
+-- - Value bindings for extracting status data
+-- - Default case via underscore (_)
+-- - Nested consider blocks supported
+-- - Functions can set status for calling consider blocks
+
+-- Example 1: Basic status matching
+@dstack {
+    push:42
+}.consider(
+    ok: dot,
+    error: push:0
+)
+
+-- Example 2: Explicit status with value binding
+func validate(n i64) i64 {
+    if (n < 0) {
+        status:negative(n)
+        return 0
+    }
+    if (n > 100) {
+        status:overflow(n)
+        return 100
+    }
+    status:ok
+    return n
+}
+
+@dstack {
+    var x i64 = validate(150)
+    push:x
+}.consider(
+    ok: {
+        dot
+    },
+    negative |val|: {
+        push:val
+        neg
+        dot
+    },
+    overflow |val|: {
+        push:999
+        dot
+    },
+    _: {
+        push:0
+        dot
+    }
+)
+
+-- Example 3: Error propagation from functions
+func safe_sqrt(n i64) i64 {
+    if (n < 0) {
+        status:error
+        return 0
+    }
+    -- Simplified: just return n/2 for demo
+    status:ok
+    return n / 2
+}
+
+@dstack {
+    var root i64 = safe_sqrt(100)
+    push:root
+}.consider(
+    ok: dot,
+    error: {
+        push:0
+        push:1
+        sub
+        dot
+    }
+)
+
+push:888
+dot

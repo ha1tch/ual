@@ -1,0 +1,31 @@
+-- Test local arrays in compute blocks
+-- Sum first N integers using a local buffer
+@nums = stack.new(i64)
+@nums push(10)
+
+@nums {
+}.compute(
+    {|n|
+        var buf[100]
+        var i = 0
+        
+        -- Fill buffer with 1..n
+        while i < n {
+            buf[i] = i + 1
+            i = i + 1
+        }
+        
+        -- Sum the buffer
+        var sum = 0
+        i = 0
+        while i < n {
+            sum = sum + buf[i]
+            i = i + 1
+        }
+        
+        return sum
+    }
+)
+
+-- Expected: 1+2+3+4+5+6+7+8+9+10 = 55
+@nums dot

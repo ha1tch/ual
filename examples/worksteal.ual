@@ -1,0 +1,34 @@
+-- Work-stealing demo using new ual syntax
+
+-- Create task queue with fixed capacity
+@tasks = stack.new(i64, cap: 100)
+
+-- Push tasks using block syntax
+@tasks {
+    push:1
+    push:2
+    push:3
+    push:4
+    push:5
+}
+
+-- Create views for owner and thief
+owner = view.new(LIFO)
+thief = view.new(FIFO)
+
+-- Attach both to same stack
+owner: attach(@tasks)
+thief: attach(@tasks)
+
+-- Owner pops (gets 5 - newest)
+ownerTask = owner: pop()
+
+-- Thief steals (gets 1 - oldest)
+thiefTask = thief: pop()
+
+-- Demonstrate Forth-style operations
+@numbers = stack.new(i64)
+@numbers push:10 push:20 push:30
+
+-- Sum using reduce
+sum = @numbers: reduce(0, {|a, b| a + b })

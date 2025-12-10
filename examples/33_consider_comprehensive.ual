@@ -1,0 +1,58 @@
+-- Comprehensive consider test
+
+-- Test 1: Basic ok case
+@dstack {
+    push:10
+    push:20
+    add
+}.consider(
+    ok: dot,
+    error: push:0
+)
+
+-- Test 2: Explicit status with value
+@dstack {
+    push:100
+    status:found
+}.consider(
+    ok: {
+        push:0
+        dot
+    },
+    found: {
+        dot
+    },
+    _: {
+        push:999
+        dot
+    }
+)
+
+-- Test 3: Multiple statements in handler
+@dstack {
+    push:1
+    push:2
+    push:3
+    status:multi
+}.consider(
+    multi: {
+        dot
+        dot
+        dot
+    },
+    _: push:0
+)
+
+-- Test 4: Default case
+@dstack {
+    push:42
+    status:unknown
+}.consider(
+    ok: push:0,
+    error: push:1,
+    _: dot
+)
+
+-- Done
+push:888
+dot

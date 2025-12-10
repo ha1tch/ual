@@ -1,0 +1,45 @@
+-- Test indexed write with self[i] for Indexed perspective
+-- (Container array views self.prop[i] require pre-allocated storage)
+@vec = stack.new(i64, Indexed)
+
+-- Pre-populate with 10 values
+@vec push(0) push(0) push(0) push(0) push(0)
+@vec push(0) push(0) push(0) push(0) push(0)
+
+-- Verify we can read initial values and compute sum
+@vec {
+}.compute(
+    {||
+        var sum = 0
+        var i = 0
+        while i < 10 {
+            sum = sum + self[i]  -- all zeros initially
+            i = i + 1
+        }
+        return sum
+    }
+)
+@vec dot  -- Should be 0
+
+-- Now use local arrays to process data  
+@vec push(5)
+@vec {
+}.compute(
+    {|n|
+        var squares[10]
+        var i = 0
+        while i < n {
+            squares[i] = (i + 1) * (i + 1)  -- 1, 4, 9, 16, 25
+            i = i + 1
+        }
+        
+        var sum = 0
+        i = 0
+        while i < n {
+            sum = sum + squares[i]
+            i = i + 1
+        }
+        return sum
+    }
+)
+@vec dot  -- 1 + 4 + 9 + 16 + 25 = 55

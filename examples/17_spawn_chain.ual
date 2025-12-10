@@ -1,0 +1,11 @@
+-- 17: @spawn chaining
+-- Multiple spawn ops on one line
+
+@spawn < { push:100 dot }
+@spawn < { push:200 dot }
+@spawn < { push:300 dot }
+
+-- Chain: pop and play all three
+@spawn pop play pop play pop play
+
+push:999 dot

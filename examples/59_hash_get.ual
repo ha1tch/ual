@@ -1,0 +1,12 @@
+-- Test get("key") outside compute
+@state = stack.new(i64, Hash)
+@state set("count", 42)
+@state set("limit", 100)
+
+-- Get a value and push to dstack
+@state get("count")
+dot
+
+-- Get another value
+@state get("limit")
+dot

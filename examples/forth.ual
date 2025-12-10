@@ -1,0 +1,30 @@
+-- Forth-style stack programming in ual
+
+@calc = stack.new(i64)
+
+-- Calculate (3 + 4) * (10 - 2)
+-- In Forth: 3 4 + 10 2 - *
+
+@calc {
+    push:3
+    push:4
+    add       -- stack: [7]
+    push:10
+    push:2
+    sub       -- stack: [7, 8]
+    mul       -- stack: [56]
+}
+
+result1 = @calc: pop()
+
+-- Calculate factorial of 5 using dup and mul
+-- 5! = 5 * 4 * 3 * 2 * 1 = 120
+@fact = stack.new(i64)
+@fact push:1 push:2 mul push:3 mul push:4 mul push:5 mul
+result2 = @fact: pop()
+
+-- Demonstrate swap
+@swap_demo = stack.new(i64)
+@swap_demo push:100 push:200 swap
+top = @swap_demo: pop()
+second = @swap_demo: pop()

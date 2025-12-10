@@ -1,0 +1,12 @@
+-- Minimal consider test
+
+@dstack {
+    push:42
+    dot
+}.consider(
+    ok: push:1
+    error: push:0
+)
+
+push:999
+dot

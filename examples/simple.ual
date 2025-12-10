@@ -1,0 +1,11 @@
+// Simple ual example
+// Tests basic stack operations
+
+@numbers = stack.new(i64)
+
+@numbers: push(10)
+@numbers: push(20)
+@numbers: push(30)
+
+// This gets compiled and we can verify it works
+sum = @numbers: reduce(0, {|a, b| a + b })

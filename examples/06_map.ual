@@ -1,0 +1,25 @@
+-- 06: Map - Double each element
+
+@input = stack.new(i64)
+
+-- Fill with 500 elements
+var k i64 = 0
+while (k < 500) {
+    @input push:k
+    push:k inc let:k
+}
+
+@mapped = stack.new(i64)
+var doubled i64 = 0
+
+@input.fifo for{|v|
+    push:v push:2 mul let:doubled
+    @mapped push:doubled
+}
+
+-- Output sum of mapped values
+var sum i64 = 0
+@mapped for{|v|
+    push:sum push:v add let:sum
+}
+push:sum dot

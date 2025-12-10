@@ -1,0 +1,29 @@
+-- Compute with self[i] for Indexed perspective
+-- Demonstrates array-style access inside compute blocks
+
+@vec = stack.new(f64, Indexed)
+@vec push(1.0)
+@vec push(2.0)
+@vec push(3.0)
+
+-- Compute dot product with itself: sum of squares
+@vec {
+}.compute(
+    {||
+        var sum = 0.0
+        var i = 0
+        var len = 3
+        while i < len {
+            var val = self[i]
+            sum = sum + (val * val)
+            i = i + 1
+        }
+        return sum
+    }
+)
+
+-- Result: 1 + 4 + 9 = 14
+@check = stack.new(i64)
+@check push(14)
+@check pop
+print

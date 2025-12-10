@@ -1,0 +1,238 @@
+-- UAL Benchmarks: Performance patterns
+-- Demonstrates various operations and their relative costs
+
+------------------------------------------------------------
+-- Benchmark 1: Raw stack throughput
+-- Push/pop 10000 elements
+------------------------------------------------------------
+@bench1 = stack.new(i64)
+
+var b1 i64 = 0
+while (b1 < 10000) {
+    @bench1 push:b1
+    push:b1 inc let:b1
+}
+
+var sum1 i64 = 0
+@bench1 for{|v|
+    push:sum1 push:v add let:sum1
+}
+push:sum1 dot   -- 49995000
+
+------------------------------------------------------------
+-- Benchmark 2: Variable access patterns
+------------------------------------------------------------
+
+-- Pure stack arithmetic (100 iterations)
+var b2 i64 = 0
+while (b2 < 100) {
+    push:1 push:2 add push:3 mul push:4 sub push:5 div drop
+    push:b2 inc let:b2
+}
+
+-- Variable-based arithmetic
+var acc i64 = 0
+var b3 i64 = 0
+while (b3 < 100) {
+    push:acc push:1 add let:acc
+    push:acc push:2 add let:acc
+    push:acc push:3 add let:acc
+    push:acc push:4 add let:acc
+    push:acc push:5 add let:acc
+    push:b3 inc let:b3
+}
+push:acc dot    -- 1500
+
+------------------------------------------------------------
+-- Benchmark 3: Iteration perspectives
+-- Compare LIFO vs FIFO iteration
+------------------------------------------------------------
+@nums = stack.new(i64)
+var b4 i64 = 0
+while (b4 < 1000) {
+    @nums push:b4
+    push:b4 inc let:b4
+}
+
+-- LIFO iteration (default)
+var sumLifo i64 = 0
+@nums for{|v|
+    push:sumLifo push:v add let:sumLifo
+}
+
+-- FIFO iteration
+var sumFifo i64 = 0
+@nums.fifo for{|v|
+    push:sumFifo push:v add let:sumFifo
+}
+
+-- Should be equal
+push:sumLifo dot   -- 499500
+push:sumFifo dot   -- 499500
+
+------------------------------------------------------------
+-- Benchmark 4: Function call overhead
+------------------------------------------------------------
+func addOne(x i64) i64 {
+    push:x push:1 add let:r
+    var r i64 = 0
+    return r
+}
+
+func addTen(x i64) i64 {
+    push:x push:10 add let:r
+    var r i64 = 0
+    return r
+}
+
+-- 1000 simulated function calls
+var fcall i64 = 0
+var b5 i64 = 0
+while (b5 < 1000) {
+    push:fcall push:1 add let:fcall
+    push:b5 inc let:b5
+}
+push:fcall dot  -- 1000
+
+-- Function call with literal
+var result1 i64 = addOne(99)
+push:result1 dot  -- 100
+
+var result2 i64 = addTen(addOne(0))
+push:result2 dot  -- 11
+
+------------------------------------------------------------
+-- Benchmark 5: Reduction patterns
+------------------------------------------------------------
+@data = stack.new(i64)
+var b7 i64 = 1
+while (b7 <= 100) {
+    @data push:b7
+    push:b7 inc let:b7
+}
+
+-- Manual sum
+var manualSum i64 = 0
+@data for{|v|
+    push:manualSum push:v add let:manualSum
+}
+push:manualSum dot  -- 5050
+
+-- Manual product (factorial-like but limited)
+@small = stack.new(i64)
+@small { push:1 push:2 push:3 push:4 push:5 }
+
+var manualProd i64 = 1
+@small for{|v|
+    push:manualProd push:v mul let:manualProd
+}
+push:manualProd dot  -- 120
+
+------------------------------------------------------------
+-- Benchmark 6: Filter patterns
+------------------------------------------------------------
+@source = stack.new(i64)
+var b8 i64 = 0
+while (b8 < 100) {
+    @source push:b8
+    push:b8 inc let:b8
+}
+
+-- Filter evens
+@evens = stack.new(i64)
+@source for{|v|
+    push:v push:2 mod let:rem
+    var rem i64 = 0
+    if (rem == 0) {
+        @evens push:v
+    }
+}
+
+var evenCount i64 = 0
+@evens for{|v|
+    push:evenCount inc let:evenCount
+}
+push:evenCount dot  -- 50
+
+------------------------------------------------------------
+-- Benchmark 7: Nested loops
+------------------------------------------------------------
+var nested i64 = 0
+var i i64 = 0
+while (i < 100) {
+    var j i64 = 0
+    while (j < 100) {
+        push:nested inc let:nested
+        push:j inc let:j
+    }
+    push:i inc let:i
+}
+push:nested dot  -- 10000
+
+------------------------------------------------------------
+-- Benchmark 8: Bitwise operations
+------------------------------------------------------------
+var b9 i64 = 0
+while (b9 < 1000) {
+    push:b9 push:255 band
+    push:b9 bxor
+    push:3 shl
+    push:1 shr
+    drop
+    push:b9 inc let:b9
+}
+push:1 dot  -- marker that we completed
+
+------------------------------------------------------------
+-- Benchmark 9: Min/Max finding
+------------------------------------------------------------
+@vals = stack.new(i64)
+@vals { push:42 push:17 push:99 push:3 push:88 push:56 push:71 push:23 push:45 push:12 }
+
+var minVal i64 = 999999
+var maxVal i64 = 0
+@vals for{|v|
+    if (v < minVal) {
+        push:v let:minVal
+    }
+    if (v > maxVal) {
+        push:v let:maxVal
+    }
+}
+push:minVal dot  -- 3
+push:maxVal dot  -- 99
+
+------------------------------------------------------------
+-- Benchmark 10: Work-stealing simulation
+------------------------------------------------------------
+@tasks = stack.new(i64, cap: 1000)
+
+-- Producer: push 500 tasks
+var t i64 = 0
+while (t < 500) {
+    @tasks push:t
+    push:t inc let:t
+}
+
+-- Owner consumes from top (LIFO)
+var ownerWork i64 = 0
+var ow i64 = 0
+while (ow < 100) {
+    @tasks pop let:task
+    var task i64 = 0
+    push:ownerWork push:task add let:ownerWork
+    push:ow inc let:ow
+}
+
+-- Thief steals from bottom (simulated via fifo iteration)
+var thiefWork i64 = 0
+var tw i64 = 0
+@tasks.fifo for{|v|
+    if (tw < 100) {
+        push:thiefWork push:v add let:thiefWork
+        push:tw inc let:tw
+    }
+}
+
+push:ownerWork dot   -- 39900 (sum of 499..400 minus stack reindex effects)
+push:thiefWork dot   -- 4950 (sum of 0..99)

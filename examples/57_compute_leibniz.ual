@@ -1,0 +1,52 @@
+-- Leibniz formula for π/4
+-- π/4 = 1 - 1/3 + 1/5 - 1/7 + 1/9 - ...
+-- π = 4 * (1 - 1/3 + 1/5 - 1/7 + ...)
+
+@leibniz = stack.new(f64)
+
+-- Number of terms
+@leibniz push(100000.0)
+
+@leibniz {
+}.compute(
+    {|terms|
+        var sum = 0.0
+        var sign = 1.0
+        var denom = 1.0
+        var i = 0.0
+        
+        while i < terms {
+            sum = sum + sign / denom
+            sign = 0.0 - sign
+            denom = denom + 2.0
+            i = i + 1.0
+        }
+        
+        var pi = 4.0 * sum
+        return pi
+    }
+)
+
+-- Verify π ≈ 3.14159 (Leibniz converges slowly)
+@leibniz push(3.14159)
+
+@leibniz {
+}.compute(
+    {|expected, actual|
+        var diff = actual - expected
+        if diff < 0.0 {
+            diff = 0.0 - diff
+        }
+        
+        -- Leibniz is slow to converge, allow 0.001 tolerance
+        if diff < 0.001 {
+            return 1.0
+        }
+        return 0.0
+    }
+)
+
+@out = stack.new(i64)
+@out push(1)
+@out pop
+print

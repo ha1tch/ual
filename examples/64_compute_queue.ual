@@ -1,0 +1,61 @@
+-- Test queue-based algorithm with local arrays
+-- Simulate BFS traversal counting (simplified)
+@result = stack.new(i64)
+@result push(5)  -- start node
+
+@result {
+}.compute(
+    {|start|
+        var queue[64]
+        var visited[64]
+        var head = 0
+        var tail = 0
+        var count = 0
+        
+        -- Enqueue start
+        queue[tail] = start
+        tail = tail + 1
+        visited[start] = 1
+        
+        while head < tail {
+            var u = queue[head]
+            head = head + 1
+            count = count + 1
+            
+            -- Simulate adding neighbours (u-1, u+1, u*2) if not visited
+            -- and within bounds [0, 20]
+            
+            var n1 = u - 1
+            if n1 >= 0 {
+                if visited[n1] == 0 {
+                    visited[n1] = 1
+                    queue[tail] = n1
+                    tail = tail + 1
+                }
+            }
+            
+            var n2 = u + 1
+            if n2 < 20 {
+                if visited[n2] == 0 {
+                    visited[n2] = 1
+                    queue[tail] = n2
+                    tail = tail + 1
+                }
+            }
+            
+            var n3 = u * 2
+            if n3 < 20 {
+                if visited[n3] == 0 {
+                    visited[n3] = 1
+                    queue[tail] = n3
+                    tail = tail + 1
+                }
+            }
+        }
+        
+        return count
+    }
+)
+
+-- Should visit all reachable nodes 0-19 = 20 nodes
+@result dot
