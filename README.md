@@ -250,10 +250,20 @@ ual is a **systems language disguised as a scripting language**:
 
 > "Write high-level orchestration without losing low-level control."
 
+## Authors
+Copyright (C)2025 haitch
+
+h@ual.fi
+
+https://oldbytes.space/@haitchfive
+
+
 ## License
 
-TBD
+Apache 2.0
+
+https://www.apache.org/licenses/LICENSE-2.0
 
 ---
 
-*ual v0.7.1 — Stack-based systems programming*
+*ual v0.7.1*

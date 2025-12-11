@@ -109,7 +109,7 @@ func parseFlags(args []string) []string {
 }
 
 func printUsage() {
-	fmt.Println("ual - stack-based systems language")
+	fmt.Println("ual", version)
 	fmt.Println()
 	fmt.Println("Usage:")
 	fmt.Println("  ual compile <file.ual>    Compile to Go source (.go)")
