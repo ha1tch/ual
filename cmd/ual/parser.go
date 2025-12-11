@@ -3081,6 +3081,15 @@ func (p *Parser) parsePrimary() (Expr, error) {
 	tok := p.peek()
 	
 	switch tok.Type {
+	case TokMinus:
+		// Unary minus for negative literals: push:-5, push:-3.14
+		p.advance()
+		operand, err := p.parsePrimary()
+		if err != nil {
+			return nil, err
+		}
+		return &UnaryExpr{Op: "-", Operand: operand}, nil
+		
 	case TokInt:
 		p.advance()
 		var val int64

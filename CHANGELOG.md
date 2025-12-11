@@ -2,6 +2,107 @@
 
 All notable changes to ual will be documented in this file.
 
+## [0.7.2] - 2024-12-11
+
+### Added
+
+**Negative Literal Support**
+
+Push negative values directly to stacks:
+
+```ual
+@nums = stack.new(i64)
+@nums push:-42              -- negative integer
+
+@floats = stack.new(f64)
+@floats push:-3.14          -- negative float
+```
+
+Works in all contexts: stack operations, function arguments, and compute blocks.
+
+**Compile-Time Type Checking for Push**
+
+The compiler now validates type compatibility at compile time:
+
+```ual
+@integers = stack.new(i64)
+@integers push:42           -- OK: integer to integer stack
+@integers push:3.14         -- ERROR: cannot push float literal to i64 stack
+
+@floats = stack.new(f64)
+@floats push:3.14           -- OK: float to float stack
+@floats push:42             -- OK: integer widened to float
+```
+
+**CLI Verbosity Controls**
+
+New command-line options for controlling output verbosity:
+
+```bash
+ual -q run program.ual      # Quiet: only program output
+ual run program.ual         # Normal: version header + completion messages
+ual -v build program.ual    # Verbose: detailed progress
+ual -vv run program.ual     # Debug: temp dirs, runtime paths, etc.
+```
+
+**Version Flag Variants**
+
+All standard version flag styles now work:
+
+```bash
+ual version                 # Subcommand style
+ual --version               # GNU style
+ual -version                # Go style
+```
+
+**Makefile Build System**
+
+New Makefile for streamlined builds:
+
+```bash
+make              # Build compiler
+make test         # Run all tests (runtime + examples)
+make test-runtime # Run Go unit tests only
+make test-examples # Verify all .ual files compile
+make bench        # Run benchmarks
+make install      # Install to $GOPATH/bin
+make clean        # Remove build artifacts
+make check        # fmt + vet + test (CI-friendly)
+```
+
+### Changed
+
+**CLI Output**
+
+- Version header (`ual 0.7.2`) now displayed on stderr for all commands
+- Quiet mode (`-q`) suppresses all non-error output
+- Verbose mode (`-v`) shows compilation progress
+- Debug mode (`-vv`) shows temp directories and runtime paths
+
+**Build System**
+
+- `build.sh --test` now correctly excludes `examples/` directory
+- Examples are tested separately via compilation check
+
+### Fixed
+
+**TestIndexedStack**
+
+Updated test to match current Indexed perspective semantics where parameterless `Pop()` removes the last element (array-like behaviour).
+
+### Files Added
+
+- `Makefile` — Comprehensive build system
+
+### Files Modified
+
+- `cmd/ual/main.go` — Version bump, verbosity controls, version flags
+- `cmd/ual/parser.go` — Unary minus support in `parsePrimary()`
+- `cmd/ual/codegen.go` — Type checking for push, `UnaryExpr` codegen
+- `stack_test.go` — Updated TestIndexedStack
+- `build.sh` — Fixed test command to exclude examples/
+- `VERSION` — Updated to 0.7.2
+
 ## [0.7.1] - 2024-12-10
 
 ### Added
@@ -842,6 +943,7 @@ Work-stealing comparison (1 owner + 3 thieves):
 
 | Version | Date | Highlights |
 |---------|------|------------|
+| 0.7.2 | 2024-12-11 | Negative literals, compile-time type checking, CLI verbosity controls, Makefile |
 | 0.7.1 | 2024-12-10 | Cross-language benchmarks (C, Go, ual, Python), benchmark suite reorganisation |
 | 0.7.0 | 2024-12-10 | Compute construct (.compute), self.property, self[i], set/get, local arrays, container array views |
 | 0.6.0 | 2024-12-10 | Select construct (.select), multi-stack waiting, timeouts |

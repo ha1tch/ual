@@ -1,6 +1,6 @@
 # ual
 
-**Version 0.7.1**
+**Version 0.7.2**
 
 A systems language for orchestration and embedded computation, presented with a scripting-style surface.
 
@@ -16,7 +16,7 @@ Inline DSL blocks         Native Go codegen, zero overhead
 
 ```bash
 # Build the compiler
-./build.sh
+make build
 
 # Run a program
 ./ual run examples/01_fibonacci.ual
@@ -116,7 +116,7 @@ Pattern match on outcomes with `.consider()`:
 
 ## Features
 
-### Implemented (v0.7.1)
+### Implemented (v0.7.2)
 
 - **Four perspectives**: LIFO, FIFO, Indexed, Hash
 - **Compute blocks**: Native codegen with local arrays, math functions
@@ -124,6 +124,8 @@ Pattern match on outcomes with `.consider()`:
 - **Select construct**: Multi-stack waiting with timeouts
 - **Consider construct**: Structured error handling with status
 - **Forth-style operations**: push, pop, dup, swap, rot, arithmetic
+- **Negative literals**: `push:-42`, `push:-3.14`
+- **Type checking**: Compile-time type validation for push operations
 - **Control flow**: if/elseif/else, while, break, continue
 - **Functions**: With typed parameters and returns
 - **Spawn**: Goroutine-based concurrency
@@ -157,7 +159,8 @@ Compute blocks have ~33ns fixed overhead per invocation. For computations >1μs,
 
 ```
 ual/
-├── build.sh                 # Build script
+├── Makefile                 # Build system
+├── build.sh                 # Alternative build script
 ├── cmd/ual/                 # Compiler source
 │   ├── lexer.go
 │   ├── parser.go
@@ -199,6 +202,13 @@ go version
 ## Building
 
 ```bash
+# Using Make (recommended)
+make              # Build compiler
+make test         # Run all tests
+make install      # Install to $GOPATH/bin
+make clean        # Remove build artifacts
+
+# Using build.sh
 ./build.sh              # Build compiler
 ./build.sh --test       # Build and test
 ./build.sh --install    # Install to $GOPATH/bin
@@ -208,34 +218,43 @@ go version
 ## Usage
 
 ```bash
-./ual compile <file.ual>      # Compile to Go source (.go)
-./ual build <file.ual>        # Compile to executable binary
-./ual run <file.ual>          # Compile and run immediately
-./ual tokens <file.ual>       # Show lexer tokens
-./ual ast <file.ual>          # Show parse tree
+ual compile <file.ual>      # Compile to Go source (.go)
+ual build <file.ual>        # Compile to executable binary
+ual run <file.ual>          # Compile and run immediately
+ual tokens <file.ual>       # Show lexer tokens
+ual ast <file.ual>          # Show parse tree
+ual version                 # Show version
+ual help                    # Show help
 
 # Options
-./ual build -o myapp prog.ual # Specify output name
-./ual run -v prog.ual         # Verbose output
+-o, --output <path>         # Specify output file
+-q, --quiet                 # Suppress non-error output
+-v, --verbose               # Show detailed progress
+-vv, --debug                # Show debug information
+-O, --optimize              # Use optimized dstack
+--version                   # Show version and exit
 ```
 
 ## Examples
 
 ```bash
 # Compile to Go source
-./ual compile examples/01_fibonacci.ual
+ual compile examples/01_fibonacci.ual
 # Creates: examples/01_fibonacci.go
 
 # Build executable
-./ual build examples/01_fibonacci.ual
+ual build examples/01_fibonacci.ual
 # Creates: 01_fibonacci (binary)
 
 # Run directly
-./ual run examples/01_fibonacci.ual
+ual run examples/01_fibonacci.ual
 # Output: 4181
 
+# Run quietly (only program output)
+ual -q run examples/01_fibonacci.ual
+
 # Build with custom name
-./ual build -o fib examples/01_fibonacci.ual
+ual build -o fib examples/01_fibonacci.ual
 ./fib
 ```
 
@@ -266,4 +285,4 @@ https://www.apache.org/licenses/LICENSE-2.0
 
 ---
 
-*ual v0.7.1*
+*ual v0.7.2*

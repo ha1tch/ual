@@ -111,9 +111,14 @@ info "ual version: $VERSION"
 if [ "$DO_TEST" = true ]; then
     info "Running tests..."
     
-    # Test the runtime library
+    # Test the runtime library (exclude examples - they're standalone programs)
     info "Testing runtime library..."
-    go test ./... 2>&1 | grep -E "^(ok|FAIL|---)" | tail -10 || true
+    go test -v -count=1 . ./cmd/ual 2>&1 | grep -E "^(ok|FAIL|--- PASS|--- FAIL)" || true
+    
+    # Fail if runtime tests fail
+    if ! go test -count=1 . > /dev/null 2>&1; then
+        error "Runtime tests failed"
+    fi
     
     # Test example compilation
     info "Testing example compilation..."

@@ -9,15 +9,32 @@ import (
 	"strings"
 )
 
-const version = "0.7.1"
+const version = "0.7.2"
+
+// Verbosity levels
+const (
+	verbQuiet   = 0
+	verbNormal  = 1
+	verbVerbose = 2
+	verbDebug   = 3
+)
 
 var noForth bool
 var optimize bool
 var outputPath string
-var verbose bool
+var verbosity = verbNormal
 
 func main() {
 	args := parseFlags(os.Args[1:])
+	
+	// Show version header unless quiet
+	if verbosity >= verbNormal && len(args) >= 1 {
+		cmd := args[0]
+		// Don't show header for version command (it prints its own)
+		if cmd != "version" && cmd != "v" && cmd != "help" && cmd != "h" {
+			fmt.Fprintln(os.Stderr, "ual", version)
+		}
+	}
 	
 	if len(args) < 1 {
 		printUsage()
@@ -63,7 +80,7 @@ func main() {
 		showAST(args[1])
 		
 	case "version", "v":
-		fmt.Printf("ual version %s\n", version)
+		fmt.Println("ual", version)
 		
 	case "help", "h":
 		printUsage()
@@ -86,12 +103,19 @@ func parseFlags(args []string) []string {
 	for i < len(args) {
 		arg := args[i]
 		switch arg {
+		case "--version", "-version":
+			fmt.Println("ual", version)
+			os.Exit(0)
 		case "--no-forth":
 			noForth = true
 		case "--optimize", "-O":
 			optimize = true
+		case "--quiet", "-q":
+			verbosity = verbQuiet
 		case "--verbose", "-v":
-			verbose = true
+			verbosity = verbVerbose
+		case "--debug", "-vv":
+			verbosity = verbDebug
 		case "-o", "--output":
 			if i+1 < len(args) {
 				i++
@@ -122,18 +146,21 @@ func printUsage() {
 	fmt.Println()
 	fmt.Println("Options:")
 	fmt.Println("  -o, --output <path>       Output file path")
-	fmt.Println("  -v, --verbose             Verbose output")
-	fmt.Println("  --no-forth                Disable default stacks (@dstack, @rstack, @error)")
-	fmt.Println("  --optimize, -O            Use native int64 dstack")
+	fmt.Println("  -q, --quiet               Suppress all non-error output")
+	fmt.Println("  -v, --verbose             Show detailed compilation info")
+	fmt.Println("  -vv, --debug              Show extra debugging info")
+	fmt.Println("  -O, --optimize            Use native int64 dstack")
+	fmt.Println("  --version                 Show version and exit")
+	fmt.Println("  --no-forth                Disable default stacks")
 	fmt.Println()
-	fmt.Println("Short forms: c, b, r, t, a, v, h")
+	fmt.Println("Short forms: c, b, r, t, a")
 	fmt.Println()
 	fmt.Println("Examples:")
 	fmt.Println("  ual compile program.ual           # Creates program.go")
 	fmt.Println("  ual build program.ual             # Creates program binary")
 	fmt.Println("  ual build -o myapp program.ual    # Creates myapp binary")
 	fmt.Println("  ual run program.ual               # Compiles and runs")
-	fmt.Println("  ual program.ual                   # Same as compile")
+	fmt.Println("  ual -q run program.ual            # Run quietly")
 }
 
 func readFile(path string) (string, error) {
@@ -172,10 +199,19 @@ func generateGo(path string) (string, error) {
 	codegen := NewCodeGenOptimized(noForth, optimize)
 	goCode := codegen.Generate(prog)
 	
+	// Check for type errors
+	if codegen.hasErrors() {
+		return "", fmt.Errorf("%s", codegen.getErrors()[0])
+	}
+	
 	return goCode, nil
 }
 
 func compile(path string) {
+	if verbosity >= verbVerbose {
+		fmt.Fprintf(os.Stderr, "compiling %s...\n", path)
+	}
+	
 	goCode, err := generateGo(path)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
@@ -194,10 +230,16 @@ func compile(path string) {
 		os.Exit(1)
 	}
 	
-	fmt.Fprintf(os.Stderr, "compiled %s -> %s\n", path, outPath)
+	if verbosity >= verbNormal {
+		fmt.Fprintf(os.Stderr, "compiled %s -> %s\n", path, outPath)
+	}
 }
 
 func build(path string) {
+	if verbosity >= verbVerbose {
+		fmt.Fprintf(os.Stderr, "compiling %s...\n", path)
+	}
+	
 	goCode, err := generateGo(path)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
@@ -215,6 +257,10 @@ func build(path string) {
 	}
 	defer os.RemoveAll(tmpDir)
 	
+	if verbosity >= verbDebug {
+		fmt.Fprintf(os.Stderr, "temp dir: %s\n", tmpDir)
+	}
+	
 	// Write Go source
 	goFile := filepath.Join(tmpDir, "main.go")
 	err = ioutil.WriteFile(goFile, []byte(goCode), 0644)
@@ -226,21 +272,24 @@ func build(path string) {
 	// Create go.mod with replace directive for local development
 	var goMod string
 	if ualDir != "" {
+		if verbosity >= verbDebug {
+			fmt.Fprintf(os.Stderr, "using local runtime: %s\n", ualDir)
+		}
 		goMod = fmt.Sprintf(`module ual_program
 
 go 1.22
 
-require github.com/ha1tch/ual v0.7.1
+require github.com/ha1tch/ual v%s
 
 replace github.com/ha1tch/ual => %s
-`, ualDir)
+`, version, ualDir)
 	} else {
-		goMod = `module ual_program
+		goMod = fmt.Sprintf(`module ual_program
 
 go 1.22
 
-require github.com/ha1tch/ual v0.7.1
-`
+require github.com/ha1tch/ual v%s
+`, version)
 	}
 	err = ioutil.WriteFile(filepath.Join(tmpDir, "go.mod"), []byte(goMod), 0644)
 	if err != nil {
@@ -263,21 +312,23 @@ require github.com/ha1tch/ual v0.7.1
 	// Run go mod tidy to resolve dependencies
 	tidyCmd := exec.Command("go", "mod", "tidy")
 	tidyCmd.Dir = tmpDir
-	if verbose {
+	if verbosity >= verbDebug {
 		tidyCmd.Stdout = os.Stdout
 		tidyCmd.Stderr = os.Stderr
 	}
 	tidyCmd.Run() // ignore errors, build will catch them
 	
 	// Run go build
-	if verbose {
+	if verbosity >= verbVerbose {
 		fmt.Fprintf(os.Stderr, "building %s...\n", binaryPath)
 	}
 	
 	cmd := exec.Command("go", "build", "-o", binaryPath, ".")
 	cmd.Dir = tmpDir
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
+	if verbosity >= verbDebug {
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+	}
 	
 	err = cmd.Run()
 	if err != nil {
@@ -285,10 +336,16 @@ require github.com/ha1tch/ual v0.7.1
 		os.Exit(1)
 	}
 	
-	fmt.Fprintf(os.Stderr, "built %s -> %s\n", path, binaryPath)
+	if verbosity >= verbNormal {
+		fmt.Fprintf(os.Stderr, "built %s -> %s\n", path, binaryPath)
+	}
 }
 
 func run(path string, args []string) {
+	if verbosity >= verbVerbose {
+		fmt.Fprintf(os.Stderr, "compiling %s...\n", path)
+	}
+	
 	goCode, err := generateGo(path)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
@@ -306,6 +363,10 @@ func run(path string, args []string) {
 	}
 	defer os.RemoveAll(tmpDir)
 	
+	if verbosity >= verbDebug {
+		fmt.Fprintf(os.Stderr, "temp dir: %s\n", tmpDir)
+	}
+	
 	// Write Go source
 	goFile := filepath.Join(tmpDir, "main.go")
 	err = ioutil.WriteFile(goFile, []byte(goCode), 0644)
@@ -317,21 +378,24 @@ func run(path string, args []string) {
 	// Create go.mod with replace directive for local development
 	var goMod string
 	if ualDir != "" {
+		if verbosity >= verbDebug {
+			fmt.Fprintf(os.Stderr, "using local runtime: %s\n", ualDir)
+		}
 		goMod = fmt.Sprintf(`module ual_program
 
 go 1.22
 
-require github.com/ha1tch/ual v0.7.1
+require github.com/ha1tch/ual v%s
 
 replace github.com/ha1tch/ual => %s
-`, ualDir)
+`, version, ualDir)
 	} else {
-		goMod = `module ual_program
+		goMod = fmt.Sprintf(`module ual_program
 
 go 1.22
 
-require github.com/ha1tch/ual v0.7.1
-`
+require github.com/ha1tch/ual v%s
+`, version)
 	}
 	err = ioutil.WriteFile(filepath.Join(tmpDir, "go.mod"), []byte(goMod), 0644)
 	if err != nil {
@@ -342,14 +406,14 @@ require github.com/ha1tch/ual v0.7.1
 	// Run go mod tidy to resolve dependencies
 	tidyCmd := exec.Command("go", "mod", "tidy")
 	tidyCmd.Dir = tmpDir
-	if verbose {
+	if verbosity >= verbDebug {
 		tidyCmd.Stdout = os.Stdout
 		tidyCmd.Stderr = os.Stderr
 	}
 	tidyCmd.Run() // ignore errors, run will catch them
 	
 	// Run go run
-	if verbose {
+	if verbosity >= verbVerbose {
 		fmt.Fprintf(os.Stderr, "running %s...\n", path)
 	}
 	

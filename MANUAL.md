@@ -1,6 +1,6 @@
 # ual Manual
 
-**Version 0.7.1**
+**Version 0.7.2**
 
 A systems language for orchestration and embedded computation, presented with a scripting-style surface.
 
@@ -37,7 +37,10 @@ go version
 ## Installation
 
 ```bash
-# Build the compiler
+# Using Make (recommended)
+make build
+
+# Or using build.sh
 ./build.sh
 
 # Or manually:
@@ -48,17 +51,28 @@ go build -o ual
 ## Usage
 
 ```bash
-# Compile to Go source
-./ual compile program.ual
-# Output: program.go
+# Commands
+ual compile program.ual     # Compile to Go source (.go)
+ual build program.ual       # Build executable binary
+ual run program.ual         # Compile and run immediately
+ual tokens program.ual      # Show lexer tokens
+ual ast program.ual         # Show parse tree
+ual version                 # Show version
+ual help                    # Show help
 
-# Build executable binary
-./ual build program.ual
-# Output: program (binary)
+# Options
+-o, --output <path>         # Output file path
+-q, --quiet                 # Suppress non-error output
+-v, --verbose               # Show detailed compilation info
+-vv, --debug                # Show debug information
+-O, --optimize              # Use optimized dstack
+--version                   # Show version and exit
 
-# Run immediately
-./ual run program.ual
-# Compiles and executes in one step
+# Examples
+ual compile program.ual           # Creates program.go
+ual build -o myapp program.ual    # Creates myapp binary
+ual -q run program.ual            # Run quietly
+ual -v build program.ual          # Verbose build
 ```
 
 ## Quick Start
@@ -152,6 +166,22 @@ val = @numbers pop()        -- pop into variable
 
 -- Colon shorthand
 @numbers push:100           -- same as push(100)
+
+-- Negative literals
+@numbers push:-42           -- negative integer
+@floats push:-3.14          -- negative float
+```
+
+**Type Safety**: The compiler enforces type compatibility at compile time:
+
+```ual
+@integers = stack.new(i64)
+@integers push:42           -- OK: integer to integer stack
+@integers push:3.14         -- ERROR: cannot push float to i64 stack
+
+@floats = stack.new(f64)
+@floats push:3.14           -- OK: float to float stack
+@floats push:42             -- OK: integer widened to float
 ```
 
 ### Stack Operators (Forth-Style)
@@ -659,6 +689,7 @@ STACK CREATION
 
 PUSH/POP
     @s push(value)      @s push:value
+    @s push:-42         @s push:-3.14     -- negative literals
     x = @s pop()        @s pop
 
 ARITHMETIC
@@ -724,4 +755,4 @@ BRING
 
 ---
 
-*ual v0.7.1 — A systems language disguised as a scripting language.*
+*ual v0.7.2 — A systems language disguised as a scripting language.*

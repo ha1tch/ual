@@ -79,10 +79,30 @@ func TestIndexedStack(t *testing.T) {
 		t.Errorf("expected 200, got %d", bytesToInt(val))
 	}
 	
-	// Pop without index should fail
+	// Stack is now [100, 300]
+	// Pop without index removes last element (array semantics)
+	val, err = s.Pop()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if bytesToInt(val) != 300 {
+		t.Errorf("expected 300, got %d", bytesToInt(val))
+	}
+	
+	// Stack is now [100]
+	// Pop again should return 100
+	val, err = s.Pop()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if bytesToInt(val) != 100 {
+		t.Errorf("expected 100, got %d", bytesToInt(val))
+	}
+	
+	// Stack is empty, pop should fail
 	_, err = s.Pop()
 	if err == nil {
-		t.Error("expected error for indexed pop without param")
+		t.Error("expected error for pop on empty stack")
 	}
 }
 

@@ -17,6 +17,7 @@ type CodeGen struct {
 	noForth       bool              // --no-forth flag
 	optimize      bool              // --optimize flag: use native Go variables
 	considerStack []string          // stack of status variable names for nested consider blocks
+	errors        []string          // compilation errors
 }
 
 func NewCodeGen() *CodeGen {
@@ -28,6 +29,7 @@ func NewCodeGen() *CodeGen {
 		symbols:  NewSymbolTable(),
 		noForth:  false,
 		optimize: false,
+		errors:   make([]string, 0),
 	}
 }
 
@@ -40,6 +42,7 @@ func NewCodeGenWithOptions(noForth bool) *CodeGen {
 		symbols:      NewSymbolTable(),
 		noForth:      noForth,
 		optimize:     false,
+		errors:       make([]string, 0),
 	}
 }
 
@@ -52,7 +55,20 @@ func NewCodeGenOptimized(noForth, optimize bool) *CodeGen {
 		symbols:      NewSymbolTable(),
 		noForth:      noForth,
 		optimize:     optimize,
+		errors:       make([]string, 0),
 	}
+}
+
+func (g *CodeGen) addError(msg string) {
+	g.errors = append(g.errors, msg)
+}
+
+func (g *CodeGen) hasErrors() bool {
+	return len(g.errors) > 0
+}
+
+func (g *CodeGen) getErrors() []string {
+	return g.errors
 }
 
 func (g *CodeGen) write(s string) {
@@ -1786,6 +1802,9 @@ func (g *CodeGen) generateExprValue(expr Expr) string {
 		left := g.generateExprValue(e.Left)
 		right := g.generateExprValue(e.Right)
 		return fmt.Sprintf("(%s %s %s)", left, e.Op, right)
+	case *UnaryExpr:
+		operand := g.generateExprValue(e.Operand)
+		return fmt.Sprintf("(%s%s)", e.Op, operand)
 	case *FuncCall:
 		var args []string
 		for _, arg := range e.Args {
@@ -1849,6 +1868,11 @@ func (g *CodeGen) inferType(expr Expr) string {
 		return "f64"
 	case *StringLit:
 		return "string"
+	case *BoolLit:
+		return "bool"
+	case *UnaryExpr:
+		// For unary minus, the type is the operand's type
+		return g.inferType(e.Operand)
 	case *Ident:
 		// Look up existing variable
 		if sym := g.symbols.Lookup(e.Name); sym != nil {
@@ -1858,6 +1882,11 @@ func (g *CodeGen) inferType(expr Expr) string {
 	default:
 		return "i64"
 	}
+}
+
+// isFloatType returns true for float types
+func isFloatType(t string) bool {
+	return t == "f64" || t == "f32"
 }
 
 func (g *CodeGen) zeroValue(typ string) string {
@@ -1958,12 +1987,26 @@ func (g *CodeGen) generateStackOp(s *StackOp) {
 					return
 				}
 			}
-			// Regular push
+			// Regular push - check for type mismatch
+			elemType := g.stacks[s.Stack]
+			
+			// Check if pushing float literal to integer stack
+			if _, isFloat := s.Args[0].(*FloatLit); isFloat && !isFloatType(elemType) {
+				g.addError(fmt.Sprintf("cannot push float literal to %s stack", elemType))
+				return
+			}
+			// Check if pushing float via unary minus to integer stack
+			if unary, isUnary := s.Args[0].(*UnaryExpr); isUnary {
+				if _, isFloat := unary.Operand.(*FloatLit); isFloat && !isFloatType(elemType) {
+					g.addError(fmt.Sprintf("cannot push float literal to %s stack", elemType))
+					return
+				}
+			}
+			
 			arg := g.generateExpr(s.Args[0])
 			if nativeDstack {
 				g.writeln(fmt.Sprintf("_push(%s)", arg))
 			} else {
-				elemType := g.stacks[s.Stack]
 				wrapped := g.wrapValue(arg, elemType)
 				g.writeln(fmt.Sprintf("stack_%s.Push(%s)", s.Stack, wrapped))
 			}
@@ -2450,6 +2493,10 @@ func (g *CodeGen) generateExpr(expr Expr) string {
 		left := g.generateExpr(e.Left)
 		right := g.generateExpr(e.Right)
 		return fmt.Sprintf("(%s %s %s)", left, e.Op, right)
+		
+	case *UnaryExpr:
+		operand := g.generateExpr(e.Operand)
+		return fmt.Sprintf("(%s%s)", e.Op, operand)
 		
 	case *StackExpr:
 		return g.generateStackExpr(e)

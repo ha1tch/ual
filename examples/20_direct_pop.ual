@@ -34,7 +34,7 @@ push:msg dot   -- 100
 var task i64 = 0
 @jobs take:task   -- blocks until 42 arrives
 push:task dot     -- 42
-
+push:task dot
 push:999 dot
 
 -- Expected output:
