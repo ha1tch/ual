@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/ha1tch/ual/version"
+	"github.com/ha1tch/ual/pkg/version"
 )
 
 // Verbosity levels

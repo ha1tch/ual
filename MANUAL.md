@@ -1,6 +1,6 @@
 # ual Manual
 
-**Version 0.7.2**
+**Version 0.7.3**
 
 A systems language for orchestration and embedded computation, presented with a scripting-style surface.
 
@@ -541,23 +541,7 @@ if @error.len() > 0 {
 
 ---
 
-## Part 8: Walk Operations
-
-### Walk
-
-Traverse and transform:
-
-```ual
-@source walk(@dest, {|x| return x * 2 })
-```
-
-### Filter
-
-Select matching elements:
-
-```ual
-@numbers filter(@evens, {|x| return x % 2 == 0 })
-```
+## Part 8: Traversal Operations
 
 ### Reduce
 
@@ -573,6 +557,32 @@ Transform to new stack:
 
 ```ual
 @strings map(@lengths, {|s| return len(s) })
+```
+
+### Walk and Filter (Disabled)
+
+The `walk()` and `filter()` operations are currently disabled pending design review. Use explicit loops or `reduce()` instead:
+
+```ual
+-- Instead of: @source walk(@dest, {|x| return x * 2 })
+-- Use explicit iteration:
+var i i64 = 0
+while (i < @source: len()) {
+    var x i64 = @source: get(i)
+    @dest push:(x * 2)
+    i = i + 1
+}
+
+-- Instead of: @numbers filter(@evens, {|x| return x % 2 == 0 })
+-- Use explicit iteration with conditional:
+var i i64 = 0
+while (i < @numbers: len()) {
+    var x i64 = @numbers: get(i)
+    if (x % 2 == 0) {
+        @evens push:x
+    }
+    i = i + 1
+}
 ```
 
 ---
@@ -734,11 +744,10 @@ ERROR HANDLING
     @s {}.consider( ok: {} error: {} _: {} )
     status:label    status:label(value)
 
-WALK
-    @s walk(@d, fn)
-    @s filter(@d, pred)
+TRAVERSAL
     @s reduce(init, fn)
     @s map(@d, fn)
+    -- walk/filter disabled, use explicit loops
 
 BRING
     @source bring(@dest)
@@ -750,9 +759,10 @@ BRING
 
 - `CHANGELOG.md` — Version history and feature details
 - `COMPUTE_SPEC_V2.md` — Compute block specification
+- `DESIGN_v0.8.md` — Design document for v0.8 features
 - `benchmarks/RESULTS.md` — Performance analysis
-- `examples/` — Working code examples
+- `examples/` — Working code examples (71 programs)
 
 ---
 
-*ual v0.7.2 — A systems language disguised as a scripting language.*
+*ual v0.7.3 — A systems language disguised as a scripting language.*

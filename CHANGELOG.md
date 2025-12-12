@@ -2,7 +2,126 @@
 
 All notable changes to ual will be documented in this file.
 
-## [0.7.2] - 2024-12-11
+## [0.7.3] - 2025-12-12
+
+### Fixed
+
+**len() Operation**
+
+The `len()` operation now correctly returns `int64` for use in expressions:
+
+```ual
+@data = stack.new(i64)
+@data push:1 push:2 push:3
+
+var count i64 = @data: len()    -- works: count = 3
+if (@data: len() > 0) {         -- works in conditionals
+    print("not empty")
+}
+```
+
+Previously, `len()` returned Go's `int` type, causing type mismatches in UAL expressions.
+
+**clear() Operation**
+
+The `clear()` operation now works on all stacks, not just `@error` and `@spawn`:
+
+```ual
+@buffer = stack.new(i64)
+@buffer push:1 push:2 push:3
+@buffer clear                   -- now works: stack is empty
+```
+
+**ual run Output**
+
+The `ual run` command no longer prints the version banner, providing clean program output:
+
+```bash
+$ ual run examples/001_fibonacci.ual
+4181
+```
+
+The version banner still appears for `ual build` and other commands.
+
+### Added
+
+**Version Package**
+
+Version is now managed centrally in `version/version.go`:
+
+```go
+import "github.com/ha1tch/ual/pkg/version"
+fmt.Println(version.Version)  // "0.7.3"
+```
+
+**Version Synchronisation Script**
+
+New `sync_version.sh` script keeps VERSION file and version package in sync:
+
+```bash
+./sync_version.sh              # Sync VERSION → version.go
+./sync_version.sh 0.7.4        # Set new version in both files
+./sync_version.sh --check      # Verify they match (for CI)
+```
+
+**Clean Script**
+
+New `clean.sh` script removes generated files:
+
+```bash
+./clean.sh
+# Removes:
+#   examples/*.go (generated Go sources)
+#   examples/<name> (compiled binaries)
+#   ./ual, cmd/ual/ual (compiler binaries)
+#   .DS_Store, *.tmp, __MACOSX/
+```
+
+**Design Document**
+
+Added `DESIGN_v0.8.md` documenting planned features for v0.8:
+- Files and sockets as stack sources/sinks
+- Error stack architecture with forced handling
+- `expect(n)` primitive for quorum/barrier patterns
+- `@{a, b, c}` stack set syntax
+- Hash literal syntax for parameters
+
+### Changed
+
+**Examples Renumbered**
+
+All 71 examples now use consistent 3-digit prefixes (001-071), organised by feature:
+
+- 001-023: Core language features
+- 024-030: Consider construct
+- 031-033: Select construct
+- 034-051: Compute blocks
+- 052-058: Stack operations (bring, freeze, hash, view, etc.)
+- 059-071: Algorithms, benchmarks, and utilities
+
+### Disabled
+
+**walk() and filter() Operations**
+
+These operations have been disabled pending design review. The implementations created temporary stacks but discarded results, making them ineffective. Use `reduce()` or explicit loops instead:
+
+```ual
+-- Instead of walk(), use explicit iteration:
+var i i64 = 0
+while (i < @data: len()) {
+    var item i64 = @data: get(i)
+    process(item)
+    i = i + 1
+}
+```
+
+### Removed
+
+**attic/ Directory**
+
+Historical specifications and deprecated code moved to separate archive. The main distribution now contains only current, production code.
+
+## [0.7.2] - 2025-12-11
 
 ### Added
 
@@ -103,7 +222,7 @@ Updated test to match current Indexed perspective semantics where parameterless 
 - `build.sh` — Fixed test command to exclude examples/
 - `VERSION` — Updated to 0.7.2
 
-## [0.7.1] - 2024-12-10
+## [0.7.1] - 2025-12-10
 
 ### Added
 
@@ -147,7 +266,7 @@ Comprehensive benchmarks comparing ual against C, Go, and Python for compute-int
 - `benchmarks/python/python_bench.py` — Python reference benchmarks
 - `benchmarks/RESULTS.md` — Comprehensive analysis with guidance
 
-## [0.7.0] - 2024-12-10
+## [0.7.0] - 2025-12-10
 
 ### Added
 
@@ -289,7 +408,7 @@ The Hash perspective treats containers as **records/objects** rather than sequen
 - Parser: Empty bindings support (`{||}` as `TokBarBar`), unary minus, `break`/`continue` in compute
 - Codegen: Perspective-aware return handling, type-aware `print`/`dot` operations
 
-## [0.6.0] - 2024-12-10
+## [0.6.0] - 2025-12-10
 
 ### Added
 
@@ -353,7 +472,7 @@ The `.select()` construct provides Go-like select semantics for waiting on multi
 - `41_select_blocking.ual` — Blocking select without default
 - `42_select_timeout.ual` — Per-case timeout with retry
 
-## [0.5.0] - 2024-12-10
+## [0.5.0] - 2025-12-10
 
 ### Added
 
@@ -442,7 +561,7 @@ The consider construct implements "Safety by Structure" rather than "Safety by D
 
 This addresses the "Go Marshalling Horror" where error checking on every line obscures business logic.
 
-## [0.0.9] - 2024-12-09
+## [0.0.9] - 2025-12-09
 
 ### Added
 
@@ -514,7 +633,7 @@ Codegen:
 
 **Note:** Function names cannot be reserved operation keywords (add, sub, mul, etc.)
 
-## [0.0.8] - 2024-12-09
+## [0.0.8] - 2025-12-09
 
 ### Added
 
@@ -568,7 +687,7 @@ Demonstrates 12 fundamental algorithms:
 - Prime number check
 - Power/exponentiation
 
-## [0.0.7] - 2024-12-09
+## [0.0.7] - 2025-12-09
 
 ### Added
 
@@ -635,7 +754,7 @@ Codegen additions:
 - generateIfStmt, generateWhileStmt
 - generateCondition, generateCondExpr
 
-## [0.0.6] - 2024-12-09
+## [0.0.6] - 2025-12-09
 
 ### Added
 
@@ -677,7 +796,7 @@ Type stacks (Hash perspective for named slots):
 - Added TypeUint64 constant
 - Unused stack variable warnings in generated code
 
-## [0.0.5] - 2024-12-09
+## [0.0.5] - 2025-12-09
 
 ### Added
 
@@ -746,7 +865,7 @@ push:5 push:3 gt          -- true → @bool
 
 ---
 
-## [0.0.4] - 2024-12-09
+## [0.0.4] - 2025-12-09
 
 ### Added
 
@@ -794,7 +913,7 @@ dot         -- prints 99 (pop)
 
 ---
 
-## [0.0.3] - 2024-12-09
+## [0.0.3] - 2025-12-09
 
 ### Added
 
@@ -844,7 +963,7 @@ result = @calc: pop()  -- result = 56
 
 ---
 
-## [0.0.2] - 2024-12-09
+## [0.0.2] - 2025-12-09
 
 ### Added
 
@@ -890,7 +1009,7 @@ Work-stealing comparison (1 owner + 3 thieves):
 
 ---
 
-## [0.0.1] - 2024-12-09
+## [0.0.1] - 2025-12-09
 
 ### Added
 
@@ -943,17 +1062,17 @@ Work-stealing comparison (1 owner + 3 thieves):
 
 | Version | Date | Highlights |
 |---------|------|------------|
-| 0.7.2 | 2024-12-11 | Negative literals, compile-time type checking, CLI verbosity controls, Makefile |
-| 0.7.1 | 2024-12-10 | Cross-language benchmarks (C, Go, ual, Python), benchmark suite reorganisation |
-| 0.7.0 | 2024-12-10 | Compute construct (.compute), self.property, self[i], set/get, local arrays, container array views |
-| 0.6.0 | 2024-12-10 | Select construct (.select), multi-stack waiting, timeouts |
-| 0.5.0 | 2024-12-10 | Consider construct (.consider), status: statements, structured error handling |
-| 0.0.9 | 2024-12-09 | Functions (func, return), colon shorthand |
-| 0.0.8 | 2024-12-09 | For iteration with perspectives, algorithm examples |
-| 0.0.7 | 2024-12-09 | Control flow (if/elseif/else, while, break, continue) |
-| 0.0.6 | 2024-12-09 | Type stacks, variables (var, let), symbol table |
-| 0.0.5 | 2024-12-09 | Extended operators (unary, bitwise, comparison), @bool stack |
-| 0.0.4 | 2024-12-09 | Default stacks (@dstack, @rstack, @error), print/dot, tor/fromr |
-| 0.0.3 | 2024-12-09 | Forth-style syntax, block operations, Lua comments |
-| 0.0.2 | 2024-12-09 | Decoupled views, work-stealing, compiler |
-| 0.0.1 | 2024-12-09 | Core stack, perspectives, bring, walk |
+| 0.7.2 | 2025-12-11 | Negative literals, compile-time type checking, CLI verbosity controls, Makefile |
+| 0.7.1 | 2025-12-10 | Cross-language benchmarks (C, Go, ual, Python), benchmark suite reorganisation |
+| 0.7.0 | 2025-12-10 | Compute construct (.compute), self.property, self[i], set/get, local arrays, container array views |
+| 0.6.0 | 2025-12-10 | Select construct (.select), multi-stack waiting, timeouts |
+| 0.5.0 | 2025-12-10 | Consider construct (.consider), status: statements, structured error handling |
+| 0.0.9 | 2025-12-09 | Functions (func, return), colon shorthand |
+| 0.0.8 | 2025-12-09 | For iteration with perspectives, algorithm examples |
+| 0.0.7 | 2025-12-09 | Control flow (if/elseif/else, while, break, continue) |
+| 0.0.6 | 2025-12-09 | Type stacks, variables (var, let), symbol table |
+| 0.0.5 | 2025-12-09 | Extended operators (unary, bitwise, comparison), @bool stack |
+| 0.0.4 | 2025-12-09 | Default stacks (@dstack, @rstack, @error), print/dot, tor/fromr |
+| 0.0.3 | 2025-12-09 | Forth-style syntax, block operations, Lua comments |
+| 0.0.2 | 2025-12-09 | Decoupled views, work-stealing, compiler |
+| 0.0.1 | 2025-12-09 | Core stack, perspectives, bring, walk |

@@ -1,6 +1,6 @@
 # ual
 
-**Version 0.7.2**
+**Version 0.7.3**
 
 A systems language for orchestration and embedded computation, presented with a scripting-style surface.
 
@@ -19,7 +19,7 @@ Inline DSL blocks         Native Go codegen, zero overhead
 make build
 
 # Run a program
-./ual run examples/01_fibonacci.ual
+./ual run examples/001_fibonacci.ual
 ```
 
 ## Hello ual
@@ -116,7 +116,7 @@ Pattern match on outcomes with `.consider()`:
 
 ## Features
 
-### Implemented (v0.7.2)
+### Implemented (v0.7.3)
 
 - **Four perspectives**: LIFO, FIFO, Indexed, Hash
 - **Compute blocks**: Native codegen with local arrays, math functions
@@ -161,12 +161,17 @@ Compute blocks have ~33ns fixed overhead per invocation. For computations >1μs,
 ual/
 ├── Makefile                 # Build system
 ├── build.sh                 # Alternative build script
+├── clean.sh                 # Clean generated files
+├── sync_version.sh          # Version synchronisation
+├── VERSION                  # Current version
 ├── cmd/ual/                 # Compiler source
 │   ├── lexer.go
 │   ├── parser.go
 │   ├── codegen.go
 │   └── main.go
-├── examples/                # ual examples (60+)
+├── pkg/                     # Internal packages
+│   └── version/             # Version package
+├── examples/                # ual examples (71)
 ├── benchmarks/              # Performance tests
 │   ├── c/                   # C reference
 │   ├── python/              # Python reference
@@ -174,11 +179,12 @@ ual/
 ├── stack.go                 # Core stack implementation
 ├── view.go                  # Decoupled views
 ├── bring.go                 # Atomic transfer
-├── walk.go                  # Traversal operations
+├── walk.go                  # Traversal (reduce only)
 ├── worksteal.go             # Work-stealing
 ├── MANUAL.md                # Comprehensive manual
 ├── CHANGELOG.md             # Version history
-└── VERSION                  # Current version
+├── DESIGN_v0.8.md           # v0.8 design document
+└── COMPUTE_SPEC_V2.md       # Compute block spec
 ```
 
 ## Documentation
@@ -188,6 +194,7 @@ ual/
 | `MANUAL.md` | Comprehensive language manual |
 | `CHANGELOG.md` | Version history with examples |
 | `COMPUTE_SPEC_V2.md` | Compute block specification |
+| `DESIGN_v0.8.md` | Design document for v0.8 |
 | `benchmarks/RESULTS.md` | Performance analysis |
 
 ## Prerequisites
@@ -239,22 +246,22 @@ ual help                    # Show help
 
 ```bash
 # Compile to Go source
-ual compile examples/01_fibonacci.ual
-# Creates: examples/01_fibonacci.go
+ual compile examples/001_fibonacci.ual
+# Creates: examples/001_fibonacci.go
 
 # Build executable
-ual build examples/01_fibonacci.ual
+ual build examples/001_fibonacci.ual
 # Creates: 01_fibonacci (binary)
 
 # Run directly
-ual run examples/01_fibonacci.ual
+ual run examples/001_fibonacci.ual
 # Output: 4181
 
 # Run quietly (only program output)
-ual -q run examples/01_fibonacci.ual
+ual -q run examples/001_fibonacci.ual
 
 # Build with custom name
-ual build -o fib examples/01_fibonacci.ual
+ual build -o fib examples/001_fibonacci.ual
 ./fib
 ```
 
@@ -285,4 +292,4 @@ https://www.apache.org/licenses/LICENSE-2.0
 
 ---
 
-*ual v0.7.2*
+*ual v0.7.3*
