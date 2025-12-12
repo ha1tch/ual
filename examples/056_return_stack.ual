@@ -1,0 +1,47 @@
+-- return_stack.ual  
+-- Demonstrates Forth-style return stack operations (tor, fromr)
+
+-- The return stack (@rstack) is a temporary holding area
+-- tor (>R in Forth): move value from data stack to return stack
+-- fromr (R> in Forth): move value from return stack to data stack
+
+-- Example 1: Hold a value while doing other work
+push:100    -- value to save
+tor         -- move to return stack
+
+push:10
+push:20
+add         -- do some work on dstack
+dot         -- prints 30
+
+fromr       -- restore saved value
+dot         -- prints 100
+
+-- Example 2: compute (a + b) * c using return stack
+push:10     -- a
+push:20     -- b  
+push:5      -- c
+
+tor         -- save c to return stack
+
+add         -- a + b = 30
+
+fromr       -- bring c back
+mul         -- 30 * 5 = 150
+
+dot
+
+-- Example 3: Use return stack as temporary in a loop
+var i i64 = 0
+while (i < 3) {
+    push:i
+    tor         -- save i
+    push:10
+    fromr       -- get i back
+    add         -- 10 + i
+    dot
+    
+    push:i inc let:i
+}
+
+-- Output: 30, 100, 150, 10, 11, 12

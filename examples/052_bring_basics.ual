@@ -1,0 +1,29 @@
+-- bring_basics.ual
+-- Demonstrates atomic transfer between stacks with bring()
+
+-- Create source and destination stacks
+@source = stack.new(i64)
+@dest = stack.new(i64)
+
+-- Fill source stack
+@source push:10
+@source push:20
+@source push:30
+
+-- Transfer top element from source to dest
+@dest bring(@source)
+
+-- dest now has 30, source has [10, 20]
+@dest pop
+dot
+
+-- Transfer another
+@dest bring(@source)
+@dest pop
+dot
+
+-- Source should have just 10 left
+@source pop
+dot
+
+-- Output: 30, 20, 10

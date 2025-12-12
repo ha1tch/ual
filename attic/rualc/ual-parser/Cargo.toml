@@ -1,7 +1,0 @@
-[package]
-name = "ual-parser"
-version = "0.0.1"
-edition = "2021"
-
-[dependencies]
-chumsky = "0.9.2"

@@ -1,7 +1,7 @@
 # ual Makefile
 # Usage: make [target]
 
-.PHONY: all build test test-runtime test-examples bench install clean help
+.PHONY: all build test test-runtime test-examples test-compile bench install clean help
 
 # Default target
 all: build
@@ -49,38 +49,47 @@ test-runtime:
 
 test-examples: build
 	@echo ""
-	@echo "Testing example compilation..."
+	@echo "Testing examples (compile and run)..."
 	@pass=0; fail=0; \
 	for f in $(EXAMPLES_DIR)/*.ual; do \
 		if [ -f "$$f" ]; then \
 			name=$$(basename "$$f" .ual); \
-			if ./$(BINARY) compile "$$f" > /dev/null 2>&1; then \
+			echo "=== RUN   $$name"; \
+			if ./$(BINARY) -q run "$$f" > /dev/null 2>&1; then \
+				echo "--- PASS: $$name"; \
 				pass=$$((pass + 1)); \
 			else \
-				echo "  FAIL: $$name"; \
+				echo "--- FAIL: $$name"; \
 				fail=$$((fail + 1)); \
 			fi; \
 		fi; \
 	done; \
-	echo "Examples: $$pass passed, $$fail failed"; \
-	if [ $$fail -gt 0 ]; then exit 1; fi
+	if [ $$fail -eq 0 ]; then echo "PASS"; else echo "FAIL"; fi; \
+	echo "ok  	examples	$$pass passed, $$fail failed"; \
+	if [ $$fail -gt 0 ]; then exit 1; fi; \
+	echo "Example tests passed."
 
-test-run: build
-	@echo "Running example programs..."
+test-compile: build
+	@echo ""
+	@echo "Testing example compilation only..."
 	@pass=0; fail=0; \
 	for f in $(EXAMPLES_DIR)/*.ual; do \
 		if [ -f "$$f" ]; then \
 			name=$$(basename "$$f" .ual); \
-			if ./$(BINARY) run "$$f" > /dev/null 2>&1; then \
+			echo "=== RUN   $$name"; \
+			if ./$(BINARY) compile "$$f" > /dev/null 2>&1; then \
+				echo "--- PASS: $$name"; \
 				pass=$$((pass + 1)); \
 			else \
-				echo "  FAIL: $$name"; \
+				echo "--- FAIL: $$name"; \
 				fail=$$((fail + 1)); \
 			fi; \
 		fi; \
 	done; \
-	echo "Examples run: $$pass passed, $$fail failed"; \
-	if [ $$fail -gt 0 ]; then exit 1; fi
+	if [ $$fail -eq 0 ]; then echo "PASS"; else echo "FAIL"; fi; \
+	echo "ok  	examples	$$pass compiled, $$fail failed"; \
+	if [ $$fail -gt 0 ]; then exit 1; fi; \
+	echo "Compile tests passed."
 
 #------------------------------------------------------------------------------
 # Benchmark targets
@@ -154,8 +163,8 @@ help:
 	@echo "Test targets:"
 	@echo "  test           Run all tests (runtime + examples)"
 	@echo "  test-runtime   Run runtime library tests only"
-	@echo "  test-examples  Verify all examples compile"
-	@echo "  test-run       Verify all examples compile and run"
+	@echo "  test-examples  Compile and run all examples"
+	@echo "  test-compile   Compile examples only (no run)"
 	@echo ""
 	@echo "Benchmark targets:"
 	@echo "  bench          Run all benchmarks"

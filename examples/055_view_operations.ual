@@ -1,0 +1,38 @@
+-- view_operations.ual
+-- Demonstrates decoupled views on stacks
+
+@data = stack.new(i64)
+
+-- Fill the stack
+@data push:10
+@data push:20
+@data push:30
+@data push:40
+@data push:50
+
+-- Create a FIFO view on the LIFO stack
+reader = view.new(FIFO)
+reader: attach(@data)
+
+-- View sees data in FIFO order
+-- Pop through view (FIFO order: 10, 20, 30...)
+a = reader: pop()
+push:a
+dot
+
+b = reader: pop()
+push:b
+dot
+
+c = reader: pop()
+push:c
+dot
+
+-- Remaining elements via LIFO (original stack perspective)
+@data pop
+dot
+
+@data pop
+dot
+
+-- Output: 10, 20, 30, 50, 40

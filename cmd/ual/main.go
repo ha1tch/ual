@@ -7,9 +7,9 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
-)
 
-const version = "0.7.2"
+	"github.com/ha1tch/ual/version"
+)
 
 // Verbosity levels
 const (
@@ -30,9 +30,9 @@ func main() {
 	// Show version header unless quiet
 	if verbosity >= verbNormal && len(args) >= 1 {
 		cmd := args[0]
-		// Don't show header for version command (it prints its own)
-		if cmd != "version" && cmd != "v" && cmd != "help" && cmd != "h" {
-			fmt.Fprintln(os.Stderr, "ual", version)
+		// Don't show header for version, help, or run commands
+		if cmd != "version" && cmd != "v" && cmd != "help" && cmd != "h" && cmd != "run" && cmd != "r" {
+			fmt.Fprintln(os.Stderr, "ual", version.Version)
 		}
 	}
 	
@@ -80,7 +80,7 @@ func main() {
 		showAST(args[1])
 		
 	case "version", "v":
-		fmt.Println("ual", version)
+		fmt.Println("ual", version.Version)
 		
 	case "help", "h":
 		printUsage()
@@ -104,7 +104,7 @@ func parseFlags(args []string) []string {
 		arg := args[i]
 		switch arg {
 		case "--version", "-version":
-			fmt.Println("ual", version)
+			fmt.Println("ual", version.Version)
 			os.Exit(0)
 		case "--no-forth":
 			noForth = true
@@ -133,7 +133,7 @@ func parseFlags(args []string) []string {
 }
 
 func printUsage() {
-	fmt.Println("ual", version)
+	fmt.Println("ual", version.Version)
 	fmt.Println()
 	fmt.Println("Usage:")
 	fmt.Println("  ual compile <file.ual>    Compile to Go source (.go)")
@@ -282,14 +282,14 @@ go 1.22
 require github.com/ha1tch/ual v%s
 
 replace github.com/ha1tch/ual => %s
-`, version, ualDir)
+`, version.Version, ualDir)
 	} else {
 		goMod = fmt.Sprintf(`module ual_program
 
 go 1.22
 
 require github.com/ha1tch/ual v%s
-`, version)
+`, version.Version)
 	}
 	err = ioutil.WriteFile(filepath.Join(tmpDir, "go.mod"), []byte(goMod), 0644)
 	if err != nil {
@@ -388,14 +388,14 @@ go 1.22
 require github.com/ha1tch/ual v%s
 
 replace github.com/ha1tch/ual => %s
-`, version, ualDir)
+`, version.Version, ualDir)
 	} else {
 		goMod = fmt.Sprintf(`module ual_program
 
 go 1.22
 
 require github.com/ha1tch/ual v%s
-`, version)
+`, version.Version)
 	}
 	err = ioutil.WriteFile(filepath.Join(tmpDir, "go.mod"), []byte(goMod), 0644)
 	if err != nil {

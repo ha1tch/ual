@@ -1,0 +1,38 @@
+-- freeze_basics.ual
+-- Demonstrates stack immutability with freeze()
+
+@data = stack.new(i64)
+
+-- Populate the stack
+@data push:10
+@data push:20
+@data push:30
+
+-- Pop all values before freezing
+@data pop
+dot
+@data pop
+dot
+@data pop
+dot
+
+-- Refill
+@data push:100
+@data push:200
+
+-- Freeze the stack - it becomes immutable
+@data freeze
+
+-- The stack is now read-only
+-- This is useful for:
+-- 1. Safe concurrent access (multiple readers)
+-- 2. Configuration data that shouldn't change
+-- 3. Guaranteeing data integrity
+
+-- Note: Any push/pop after freeze returns an error
+-- The runtime tests verify this behavior
+
+push:888
+dot
+
+-- Output: 30, 20, 10, 888

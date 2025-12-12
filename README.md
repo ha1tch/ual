@@ -269,9 +269,6 @@ ual is a **systems language disguised as a scripting language**:
 
 > "Write high-level orchestration without losing low-level control."
 
-## ual
-The name ual is all-lowercase and it's not an acronym. It's just ual.
-
 ## Authors
 Copyright (C)2025 haitch
 

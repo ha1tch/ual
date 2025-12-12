@@ -427,6 +427,18 @@ func (s *Stack) Len() int {
 	return len(s.elements) - s.head
 }
 
+// Clear removes all elements from the stack
+func (s *Stack) Clear() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.elements = s.elements[:0]
+	s.keys = s.keys[:0]
+	s.head = 0
+	if s.perspective == Hash {
+		s.hashIdx = make(map[string]int)
+	}
+}
+
 // PushAt stores a value at a specific index (for hash/indexed stacks)
 // Used for variable storage in type stacks
 func (s *Stack) PushAt(index int, value []byte) error {

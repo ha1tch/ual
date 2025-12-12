@@ -82,12 +82,15 @@ func (g *CodeGen) writeln(s string) {
 }
 
 func (g *CodeGen) Generate(prog *Program) string {
-	// Separate function declarations from other statements
+	// Separate function declarations and stack declarations from other statements
 	var funcs []*FuncDecl
+	var stackDecls []*StackDecl
 	var otherStmts []Stmt
 	for _, stmt := range prog.Stmts {
 		if f, ok := stmt.(*FuncDecl); ok {
 			funcs = append(funcs, f)
+		} else if s, ok := stmt.(*StackDecl); ok {
+			stackDecls = append(stackDecls, s)
 		} else {
 			otherStmts = append(otherStmts, stmt)
 		}
@@ -158,6 +161,15 @@ func (g *CodeGen) Generate(prog *Program) string {
 			g.stacks["string"] = "string"
 			g.stacks["bytes"] = "bytes"
 		}
+	}
+	
+	// Generate user-declared stacks at file level (so functions can access them)
+	if len(stackDecls) > 0 {
+		g.writeln("// User-declared stacks")
+		for _, s := range stackDecls {
+			g.generateGlobalStackDecl(s)
+		}
+		g.writeln("")
 	}
 	
 	// Generate functions at file level
@@ -447,6 +459,28 @@ func (g *CodeGen) generateStackDecl(s *StackDecl) {
 	} else {
 		g.writeln(fmt.Sprintf("stack_%s %s ual.NewStack(%s, %s)", 
 			s.Name, op, persp, elemType))
+	}
+}
+
+// generateGlobalStackDecl emits a stack declaration at file level using var syntax
+func (g *CodeGen) generateGlobalStackDecl(s *StackDecl) {
+	// Skip if already declared (handles redeclaration in source)
+	if g.stacks[s.Name] != "" {
+		return
+	}
+	
+	elemType := g.mapElementType(s.ElementType)
+	persp := g.mapPerspective(s.Perspective)
+	
+	g.stacks[s.Name] = s.ElementType
+	g.perspectives[s.Name] = s.Perspective
+	
+	if s.Capacity > 0 {
+		g.writeln(fmt.Sprintf("var stack_%s = ual.NewCappedStack(%s, %s, %d)", 
+			s.Name, persp, elemType, s.Capacity))
+	} else {
+		g.writeln(fmt.Sprintf("var stack_%s = ual.NewStack(%s, %s)", 
+			s.Name, persp, elemType))
 	}
 }
 
@@ -2138,6 +2172,13 @@ func (g *CodeGen) generateStackOp(s *StackOp) {
 	case "freeze":
 		g.writeln(fmt.Sprintf("stack_%s.Freeze()", s.Stack))
 		
+	// TODO: walk and filter operations are incomplete - results are created in
+	// temp stacks but never returned or used. Need to design proper semantics:
+	// Option 1: Replace source stack contents with results
+	// Option 2: Return results to a specified destination stack
+	// Option 3: Push results to dstack
+	// For now, use reduce() or explicit for loops instead.
+	/*
 	case "walk":
 		if len(s.Args) >= 1 {
 			fn := g.generateExpr(s.Args[0])
@@ -2153,6 +2194,7 @@ func (g *CodeGen) generateStackOp(s *StackOp) {
 			// Filter needs a predicate, walk needs a transform
 			g.writeln(fmt.Sprintf("filterDest_%s.Filter(stack_%s, %s, nil)", s.Stack, s.Stack, fn))
 		}
+	*/
 		
 	// Forth-like stack operations
 	case "add":
@@ -2413,9 +2455,13 @@ func (g *CodeGen) generateStackOp(s *StackOp) {
 		}
 	
 	case "clear":
-		// @error.clear removes all errors
+		// Clear all elements from stack
 		if s.Stack == "error" {
+			// Legacy: loop-based clear for @error
 			g.writeln("for stack_error.Len() > 0 { stack_error.Pop() }")
+		} else {
+			// General stacks: use Clear() method
+			g.writeln(fmt.Sprintf("stack_%s.Clear()", s.Stack))
 		}
 	
 	case "msg":
@@ -2547,7 +2593,7 @@ func (g *CodeGen) generateStackExpr(e *StackExpr) string {
 		}
 		
 	case "len":
-		return fmt.Sprintf("stack_%s.Len()", e.Stack)
+		return fmt.Sprintf("int64(stack_%s.Len())", e.Stack)
 	}
 	
 	return "nil"

@@ -1,0 +1,123 @@
+-- Example: consider() construct with user-defined stacks
+-- Demonstrates status-based error handling with mandatory handling
+
+@data = stack.new(i64)
+
+-- Simple function that may fail
+func divide(a i64, b i64) i64 {
+    if (b == 0) {
+        status:error("division by zero")
+        return 0
+    }
+    return a / b
+}
+
+-- Test 1: Basic consider with ok/error
+func test_basic() {
+    @data {
+        var result i64 = divide(10, 2)
+        push:result
+    }.consider(
+        ok: {
+            @dstack { 
+                var v i64 = @data: pop()
+                push:v
+                dot
+            }
+        },
+        error |e|: {
+            @dstack { push:0 dot }
+        }
+    )
+}
+
+-- Test 2: Consider with explicit status setting
+func test_explicit_status() {
+    @data {
+        push:42
+        
+        -- Simulate a condition that sets custom status
+        if (1 == 1) {
+            status:success
+        }
+    }.consider(
+        success: {
+            @dstack { 
+                var v i64 = @data: pop()
+                push:v
+                dot
+            }
+        },
+        error: {
+            @dstack { push:0 dot }
+        },
+        _: {
+            -- default case
+            @dstack { push:-1 dot }
+        }
+    )
+}
+
+-- Test 3: Nested considers
+func test_nested() {
+    @data {
+        push:100
+        
+        @data {
+            push:50
+            status:inner_ok
+        }.consider(
+            inner_ok: {
+                -- inner succeeded: pop the 50, push marker 1
+                @data pop
+                @data push:1
+            },
+            _: {
+                @data pop
+                @data push:0
+            }
+        )
+        
+        status:outer_ok
+    }.consider(
+        outer_ok: {
+            @dstack { 
+                var inner i64 = @data: pop()
+                var outer i64 = @data: pop()
+                push:inner
+                dot
+                push:outer
+                dot
+            }
+        },
+        _: {
+            @dstack { push:-1 dot }
+        }
+    )
+}
+
+-- Test 4: Division by zero handling
+func test_division_error() {
+    @data {
+        var result i64 = divide(10, 0)
+        push:result
+    }.consider(
+        ok: {
+            @dstack { 
+                var v i64 = @data: pop()
+                push:v
+                dot
+            }
+        },
+        error |msg|: {
+            -- Error case: msg contains "division by zero"
+            @dstack { push:999 dot }
+        }
+    )
+}
+
+-- Run tests
+test_basic()       -- Expected: 5
+test_explicit_status()  -- Expected: 42
+test_nested()      -- Expected: 1, 100
+test_division_error()   -- Expected: 999

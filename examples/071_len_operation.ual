@@ -1,0 +1,38 @@
+-- Example: Stack length operation
+-- Demonstrates @stack: len() for querying stack size
+
+@data = stack.new(i64)
+
+-- Build up a stack
+@data push:10
+@data push:20
+@data push:30
+
+@dstack {
+    -- Get length as expression
+    var count i64 = @data: len()
+    push:count
+    dot  -- prints 3
+    
+    -- Pop one element
+    @data pop
+    
+    -- Check length again
+    var after i64 = @data: len()
+    push:after
+    dot  -- prints 2
+    
+    -- Empty check pattern
+    var empty_check i64 = @data: len()
+    if (empty_check > 0) {
+        push:1
+        dot  -- prints 1 (not empty)
+    }
+    
+    -- Clear the stack
+    @data clear
+    
+    var final i64 = @data: len()
+    push:final
+    dot  -- prints 0
+}

@@ -1,0 +1,47 @@
+-- stack_management.ual
+-- Demonstrates stack management operations
+
+@nums = stack.new(i64)
+
+-- Populate the stack
+@nums push:1
+@nums push:2
+@nums push:3
+@nums push:4
+@nums push:5
+
+-- Show values (pop reveals LIFO order)
+@nums pop
+dot
+@nums pop
+dot
+@nums pop
+dot
+
+-- Still have [1, 2]
+
+-- Clear remaining elements
+@nums clear
+
+-- Verify cleared by pushing new values
+@nums push:100
+@nums push:200
+@nums pop
+dot
+@nums pop
+dot
+
+-- Demonstrate for loop iteration (from reductions pattern)
+@data = stack.new(i64)
+@data push:10
+@data push:20
+@data push:30
+
+var sum i64 = 0
+@data for{|v|
+    push:sum push:v add let:sum
+}
+push:sum
+dot
+
+-- Output: 5, 4, 3, 200, 100, 60

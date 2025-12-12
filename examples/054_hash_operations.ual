@@ -1,0 +1,44 @@
+-- hash_operations.ual
+-- Demonstrates Hash perspective set/get operations
+
+@record = stack.new(i64, Hash)
+
+-- Set key-value pairs
+@record set("x", 10)
+@record set("y", 20)
+@record set("z", 30)
+
+-- Get values by key (pushes to dstack)
+@record get("x")
+dot
+
+@record get("y")
+dot
+
+@record get("z")
+dot
+
+-- Update a value
+@record set("x", 100)
+@record get("x")
+dot
+
+-- Integer hash for compute
+@coords = stack.new(i64, Hash)
+@coords set("x", 3)
+@coords set("y", 4)
+
+-- Compute using self.key access
+@coords {
+}.compute({||
+    var px = self.x
+    var py = self.y
+    var sum_sq = px * px + py * py
+    return sum_sq
+})
+
+-- Result stored at __result_0__
+@coords get("__result_0__")
+dot
+
+-- Output: 10, 20, 30, 100, 25

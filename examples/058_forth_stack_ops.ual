@@ -1,0 +1,64 @@
+-- forth_stack_ops.ual
+-- Demonstrates Forth-style stack manipulation operations
+
+-- dup: duplicate top of stack
+push:42
+dup
+dot
+dot
+-- Output: 42, 42
+
+-- drop: discard top of stack
+push:100
+push:200
+drop
+dot
+-- Output: 100
+
+-- swap: exchange top two elements
+push:10
+push:20
+swap
+dot
+dot
+-- Output: 10, 20 (reversed)
+
+-- over: copy second element to top
+push:1
+push:2
+over
+dot
+dot
+dot
+-- Output: 1, 2, 1 (1 copied over 2)
+
+-- rot: rotate top three elements (third to top)
+push:100
+push:200
+push:300
+rot
+dot
+dot
+dot
+-- Output: 100, 300, 200 (100 rotated to top)
+
+-- Combining operations: compute a*a + b*b
+push:3    -- a
+push:4    -- b
+
+-- Stack: [3, 4]
+over      -- [3, 4, 3]
+over      -- [3, 4, 3, 4]
+mul       -- [3, 4, 12]    (3*4)
+swap      -- [3, 12, 4]
+drop      -- [3, 12]
+swap      -- [12, 3]
+dup       -- [12, 3, 3]
+mul       -- [12, 9]       (3*3)
+add       -- [21]
+dot
+-- Output: 21 (not quite a²+b², but shows stack manipulation)
+
+-- Final marker
+push:999
+dot
