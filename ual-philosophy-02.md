@@ -1,4 +1,4 @@
-# The Philosophy of UAL
+# The Philosophy of ual
 
 ## Part Two: The Ground and What Emerges
 
@@ -26,13 +26,13 @@ In the late twentieth century, Gilles Deleuze articulated a similar vision in di
 
 What does any of this have to do with programming?
 
-In UAL, data lives in stacks. But what is a stack, at the lowest level? It is a sequence of bytes — `[]byte` in Go's notation. These bytes have no inherent type. They are not integers or strings or floats. They are undifferentiated, indefinite, awaiting interpretation. The bytes are apeiron.
+In ual, data lives in stacks. But what is a stack, at the lowest level? It is a sequence of bytes — `[]byte` in Go's notation. These bytes have no inherent type. They are not integers or strings or floats. They are undifferentiated, indefinite, awaiting interpretation. The bytes are apeiron.
 
 When you declare a stack with a type and a perspective — `stack.new(i64, LIFO)` — you are bounding the boundless. You are imposing definite form on indefinite ground. The bytes become interpretable as integers, accessible in a particular order. But the bytes themselves remain bytes. The type is not inherent in them; it is a mode of engagement with them.
 
-This is not a mere implementation detail. It is the ontological structure of the language. UAL does not begin with typed values that exist independently. It begins with undifferentiated ground from which typed engagement emerges. The perspective system — LIFO, FIFO, Indexed, Hash — represents different ways of bounding the boundless, different modes of giving definite form to indefinite substrate.
+This is not a mere implementation detail. It is the ontological structure of the language. ual does not begin with typed values that exist independently. It begins with undifferentiated ground from which typed engagement emerges. The perspective system — LIFO, FIFO, Indexed, Hash — represents different ways of bounding the boundless, different modes of giving definite form to indefinite substrate.
 
-And like Anaximander's bounded things, values in UAL owe a debt. They emerge from the byte-ground through a push, they exist in bounded form for a time, and they return to the ground through a pop. The Stack is the locus where this economy of emergence and return takes place. Time, as Anaximander said, is the judge — and UAL takes time seriously, as we shall see.
+And like Anaximander's bounded things, values in ual owe a debt. They emerge from the byte-ground through a push, they exist in bounded form for a time, and they return to the ground through a pop. The Stack is the locus where this economy of emergence and return takes place. Time, as Anaximander said, is the judge — and ual takes time seriously, as we shall see.
 
 Whitehead's vocabulary maps with uncomfortable precision. A push is an actual occasion — an event that happens, integrates its context (the value being pushed, the stack receiving it), achieves definite form (the value now accessible), and completes. A blocking take is prehension — active grasping that waits for what another occasion will provide, constitutive incorporation of what emerges. The Stack itself is a society — not a thing with fixed nature but a pattern of occasions, a stability maintained through process.
 
@@ -40,10 +40,10 @@ The `.compute()` block is concrescence. Multiple values are prehended (bound to 
 
 This is not retrofitting. The design decisions came first, from thinking about what programs actually do, about what coordination requires, about where complexity lives. The philosophical alignment emerged because the same truths apply. Anaximander and Whitehead were not thinking about computers, but they were thinking about reality, and programs are part of reality.
 
-The ground is indefinite. What emerges is bounded. The bounding is a process, not a state. Time governs the economy of emergence and return. These are not metaphors imposed on UAL. They are what UAL embodies, discovered through design and confirmed through implementation.
+The ground is indefinite. What emerges is bounded. The bounding is a process, not a state. Time governs the economy of emergence and return. These are not metaphors imposed on ual. They are what ual embodies, discovered through design and confirmed through implementation.
 
 The tradition that buried these insights gave us objects and classes, hierarchies and taxonomies, the assumption that definite things are fundamental and processes are what happen to them. That tradition struggles with coordination, with time, with the fluid realities of concurrent systems. Perhaps because it started from assumptions that are simply false.
 
-UAL starts elsewhere. From the indefinite ground, from process as primary, from the bounded as emergent and temporary. It is an old philosophy, recovered and embodied. The test is whether it works — whether programs built on these foundations are more coherent, more comprehensible, more true to what programs actually are.
+ual starts elsewhere. From the indefinite ground, from process as primary, from the bounded as emergent and temporary. It is an old philosophy, recovered and embodied. The test is whether it works — whether programs built on these foundations are more coherent, more comprehensible, more true to what programs actually are.
 
 The machine will judge.

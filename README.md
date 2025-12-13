@@ -195,7 +195,7 @@ ual/
 │   ├── CHANGELOG.md         # Version history
 │   ├── DESIGN_v0.8.md       # v0.8 design document
 │   └── ...
-├── examples/                # UAL examples (71)
+├── examples/                # ual examples (71)
 ├── benchmarks/              # Performance tests
 ├── ual-philosophy-*.md      # Philosophy essays (4)
 ├── Makefile                 # Build system
