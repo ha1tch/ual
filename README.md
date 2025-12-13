@@ -4,6 +4,17 @@
 
 A systems language for orchestration and embedded computation, presented with a scripting-style surface.
 
+**ual** comes in two forms: a **compiler** that helps to generate native  binaries for production, and an **interpreter** for development and exploration. Both share the same runtime and produce identical results — write once, run either way.
+
+## Philosophy
+
+UAL is built on a specific philosophical foundation: that coordination is the primary problem of programming, and computation is a subordinate activity within coordinated contexts.
+
+- [Part One: Why Philosophy Matters for Language Design](ual-philosophy-01.md)
+- [Part Two: The Ground and What Emerges](ual-philosophy-02.md)
+- [Part Three: Boundaries, Time, and Acknowledgment](ual-philosophy-03.md)
+- [Part Four: Coordination Precedes Computation](ual-philosophy-04.md)
+
 ```
 Surface Feel              Actual Semantics
 ─────────────────         ─────────────────────────────────
@@ -179,18 +190,30 @@ ual/
 │   ├── parser/              # Parser
 │   ├── runtime/             # Stack, Value, Views
 │   └── version/             # Version management
-├── docs/                    # Documentation
+├── docs/                    # Technical documentation
 │   ├── MANUAL.md            # Language manual
 │   ├── CHANGELOG.md         # Version history
 │   ├── DESIGN_v0.8.md       # v0.8 design document
 │   └── ...
 ├── examples/                # UAL examples (71)
 ├── benchmarks/              # Performance tests
+├── ual-philosophy-*.md      # Philosophy essays (4)
 ├── Makefile                 # Build system
 └── README.md                # This file
 ```
 
 ## Documentation
+
+**Philosophy:**
+
+| Document | Description |
+|----------|-------------|
+| [ual-philosophy-01.md](ual-philosophy-01.md) | Why philosophy matters for language design |
+| [ual-philosophy-02.md](ual-philosophy-02.md) | The ground and what emerges |
+| [ual-philosophy-03.md](ual-philosophy-03.md) | Boundaries, time, and acknowledgment |
+| [ual-philosophy-04.md](ual-philosophy-04.md) | Coordination precedes computation |
+
+**Technical:**
 
 | Document | Description |
 |----------|-------------|
