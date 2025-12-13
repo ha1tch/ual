@@ -15,6 +15,10 @@ A systems language for orchestration and embedded computation, presented with a 
 - [Part Three: Boundaries, Time, and Acknowledgment](ual-philosophy-03.md)
 - [Part Four: Coordination Precedes Computation](ual-philosophy-04.md)
 
+## ual Manual
+- [MANUAL.md](docs/MANUAL.md)
+
+
 ```
 Surface Feel              Actual Semantics
 ─────────────────         ─────────────────────────────────
