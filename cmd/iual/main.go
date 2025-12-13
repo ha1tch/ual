@@ -129,11 +129,6 @@ NOTE:
 }
 
 func runFile(path string) {
-	// Show version header unless quiet
-	if verbosity >= verbNormal {
-		fmt.Fprintln(os.Stderr, "iual", version.Version)
-	}
-
 	// Read source file
 	source, err := ioutil.ReadFile(path)
 	if err != nil {
