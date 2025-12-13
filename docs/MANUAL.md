@@ -27,7 +27,11 @@ ual is designed for:
 
 ## Prerequisites
 
-Go 1.22 or later must be installed. This is the only dependency.
+**To build ual from source:** Go 1.22 or later must be installed. This is the only dependency.
+
+**To compile ual programs to native binaries:** You need both the ual compiler and Go installed. Go is a separate project by the Go Authors and can be downloaded here: https://go.dev/dl/
+
+**To run ual programs without compiling:** You can use the interpreter without installing Go. Download iual for your platform here: https://github.com/ha1tch/ual/releases
 
 ```bash
 # Check Go installation

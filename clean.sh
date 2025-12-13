@@ -27,6 +27,8 @@ for f in examples/*.ual; do
 done
 echo "  Removed $count compiled binaries from examples/"
 
+
+
 # Remove the ual binary if it exists at project root
 if [ -f "./ual" ]; then
     rm "./ual"
@@ -38,6 +40,19 @@ if [ -f "cmd/ual/ual" ]; then
     rm "cmd/ual/ual"
     echo "  Removed cmd/ual/ual binary"
 fi
+
+
+ # Remove the ual binary if it exists at project root
+ if [ -f "./iual" ]; then
+    rm "./iual"
+    echo "  Removed ./iual binary"
+ fi  
+  
+ # Remove cmd/iual/ual binary if present
+if [ -f "cmd/iual/iual" ]; then
+   rm "cmd/iual/iual"
+   echo "  Removed cmd/iual/iual binary"
+fi 
 
 # Remove any temp files
 find . -name "*.tmp" -delete 2>/dev/null || true
