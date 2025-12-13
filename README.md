@@ -4,11 +4,11 @@
 
 A systems language for orchestration and embedded computation, presented with a scripting-style surface.
 
-**ual** comes in two forms: a **compiler** that helps to generate native  binaries for production, and an **interpreter** for development and exploration. Both share the same runtime and produce identical results — write once, run either way.
+**ual** comes in two forms: a **compiler** that builds native  binaries for production, and an **interpreter** for development and exploration. Both share the same runtime and produce identical results — write once, run either way.
 
 ## Philosophy
 
-UAL is built on a specific philosophical foundation: that coordination is the primary problem of programming, and computation is a subordinate activity within coordinated contexts.
+**ual** is built on a specific philosophical foundation: that coordination is the primary problem of programming, and computation is a subordinate activity within coordinated contexts.
 
 - [Part One: Why Philosophy Matters for Language Design](ual-philosophy-01.md)
 - [Part Two: The Ground and What Emerges](ual-philosophy-02.md)
