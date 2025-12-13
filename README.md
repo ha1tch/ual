@@ -4,7 +4,7 @@
 
 A systems language for orchestration and embedded computation, presented with a scripting-style surface.
 
-**ual** comes in two forms: a **compiler** that builds native  binaries for production, and an **interpreter** for development and exploration. Both share the same runtime and produce identical results — write once, run either way.
+**ual** comes in two forms: a **compiler** that builds native binaries for production, and an **interpreter** for development and exploration. Both share the same runtime and produce identical results — write once, run either way.
 
 ## Philosophy
 
