@@ -121,6 +121,101 @@ while (i < @data: len()) {
 
 Historical specifications and deprecated code moved to separate archive. The main distribution now contains only current, production code.
 
+---
+
+### Runtime Unification (2025-12-13)
+
+This update completes Phase 1 and Phase 2 of runtime unification, bringing the interpreter to full parity with the compiler.
+
+#### Added
+
+**Interpreter (iual)**
+
+The UAL interpreter is now a first-class tool with full feature parity:
+
+```bash
+iual examples/001_fibonacci.ual       # Run with interpreter
+iual --trace examples/022_pipeline.ual # Trace concurrent execution
+iual -q examples/067_simple.ual       # Quiet mode
+```
+
+Features:
+- Tree-walking interpreter at `cmd/iual/`
+- True goroutine-based concurrency (matches compiler semantics)
+- Shared runtime types with compiler via `pkg/runtime/`
+- All 71 example programs pass in both compiler and interpreter
+- `--trace` flag for execution tracing
+- Quiet mode (`-q`) for scripting
+
+**Runtime Package (pkg/runtime/)**
+
+Unified runtime types shared between compiler and interpreter:
+
+- `Value` — Type-safe value wrapper (int64, float64, string, bytes, bool)
+- `ValueStack` — Stack of Values with type checking
+- `ScopeStack` — Variable scope management for interpreter
+- Existing types retained: `Stack`, `View`, `Bring`, `Walk`
+
+**Package Restructure**
+
+Shared packages extracted to `pkg/`:
+
+```
+pkg/
+├── ast/         # Abstract syntax tree definitions
+├── lexer/       # Lexical analysis
+├── parser/      # Parser
+├── runtime/     # Stack, Value, Views, Walk, Bring
+└── version/     # Version management
+```
+
+#### Changed
+
+**Interpreter Concurrency Model**
+
+The interpreter now uses true goroutines for `@spawn pop play`:
+
+```ual
+@spawn < { producer() }
+@spawn < { consumer() }
+@spawn pop play    -- Now launches real goroutine
+@spawn pop play    -- Now launches real goroutine
+```
+
+Previously, spawn tasks ran synchronously. Now they run concurrently, matching the compiler's `go _task()` semantics. This enables proper producer-consumer patterns and pipeline parallelism.
+
+**Blocking Take**
+
+The `take` operation now blocks correctly in the interpreter, waiting for concurrent producers:
+
+```ual
+@channel = stack.new(i64)
+@channel perspective(FIFO)
+
+@spawn < {
+    @channel < 42    -- Producer pushes value
+}
+@spawn pop play
+
+var value i64 = 0
+@channel take:value  -- Blocks until value available
+print(value)         -- 42
+```
+
+#### Fixed
+
+- Interpreter `take` no longer uses artificial timeouts
+- Variable scoping in interpreter matches compiler behaviour
+- Stack perspective changes work correctly in interpreter
+- Spawn task execution order matches compiler (LIFO)
+
+#### Tests
+
+- 71/71 example programs pass with compiler (`ual run`)
+- 71/71 example programs pass with interpreter (`iual`)
+- Runtime package has comprehensive unit tests
+- Concurrency tests (pipeline, take_sync) work identically in both tools
+
 ## [0.7.2] - 2025-12-11
 
 ### Added

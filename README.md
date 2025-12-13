@@ -15,11 +15,14 @@ Inline DSL blocks         Native Go codegen, zero overhead
 ## Quick Start
 
 ```bash
-# Build the compiler
+# Build the compiler and interpreter
 make build
 
-# Run a program
+# Run a program with the compiler
 ./ual run examples/001_fibonacci.ual
+
+# Or run with the interpreter (for development)
+./iual examples/001_fibonacci.ual
 ```
 
 ## Hello ual
@@ -132,6 +135,8 @@ Pattern match on outcomes with `.consider()`:
 - **Views**: Decoupled perspectives on shared data
 - **Work-stealing**: LIFO owner + FIFO thieves pattern
 - **Bring**: Atomic transfer with type conversion
+- **Interpreter (iual)**: Tree-walking interpreter with full parity
+- **Shared runtime**: `pkg/runtime` used by both compiler and interpreter
 
 ### Not Yet Implemented
 
@@ -159,43 +164,42 @@ Compute blocks have ~33ns fixed overhead per invocation. For computations >1μs,
 
 ```
 ual/
-├── Makefile                 # Build system
-├── build.sh                 # Alternative build script
-├── clean.sh                 # Clean generated files
-├── sync_version.sh          # Version synchronisation
-├── VERSION                  # Current version
-├── cmd/ual/                 # Compiler source
-│   ├── lexer.go
-│   ├── parser.go
-│   ├── codegen.go
-│   └── main.go
-├── pkg/                     # Internal packages
-│   └── version/             # Version package
-├── examples/                # ual examples (71)
+├── cmd/
+│   ├── ual/                 # Compiler (Go codegen)
+│   │   ├── main.go
+│   │   └── codegen.go
+│   └── iual/                # Interpreter (tree-walking)
+│       ├── main.go
+│       ├── interp.go
+│       ├── interp_control.go
+│       └── interp_expr.go
+├── pkg/                     # Shared packages
+│   ├── ast/                 # Abstract syntax tree
+│   ├── lexer/               # Lexical analysis
+│   ├── parser/              # Parser
+│   ├── runtime/             # Stack, Value, Views
+│   └── version/             # Version management
+├── docs/                    # Documentation
+│   ├── MANUAL.md            # Language manual
+│   ├── CHANGELOG.md         # Version history
+│   ├── DESIGN_v0.8.md       # v0.8 design document
+│   └── ...
+├── examples/                # UAL examples (71)
 ├── benchmarks/              # Performance tests
-│   ├── c/                   # C reference
-│   ├── python/              # Python reference
-│   └── *.go                 # Go benchmarks
-├── stack.go                 # Core stack implementation
-├── view.go                  # Decoupled views
-├── bring.go                 # Atomic transfer
-├── walk.go                  # Traversal (reduce only)
-├── worksteal.go             # Work-stealing
-├── MANUAL.md                # Comprehensive manual
-├── CHANGELOG.md             # Version history
-├── DESIGN_v0.8.md           # v0.8 design document
-└── COMPUTE_SPEC_V2.md       # Compute block spec
+├── Makefile                 # Build system
+└── README.md                # This file
 ```
 
 ## Documentation
 
 | Document | Description |
 |----------|-------------|
-| `MANUAL.md` | Comprehensive language manual |
-| `CHANGELOG.md` | Version history with examples |
-| `COMPUTE_SPEC_V2.md` | Compute block specification |
-| `DESIGN_v0.8.md` | Design document for v0.8 |
-| `benchmarks/RESULTS.md` | Performance analysis |
+| [docs/MANUAL.md](docs/MANUAL.md) | Comprehensive language manual |
+| [docs/CHANGELOG.md](docs/CHANGELOG.md) | Version history with examples |
+| [docs/COMPUTE_SPEC_V2.md](docs/COMPUTE_SPEC_V2.md) | Compute block specification |
+| [docs/DESIGN_v0.8.md](docs/DESIGN_v0.8.md) | Design document for v0.8 |
+| [docs/ERROR_PHILOSOPHY.md](docs/ERROR_PHILOSOPHY.md) | Error handling philosophy |
+| [docs/BENCHMARK_SPECIFICATION.md](docs/BENCHMARK_SPECIFICATION.md) | Benchmark suite specification |
 
 ## Prerequisites
 
@@ -224,6 +228,8 @@ make clean        # Remove build artifacts
 
 ## Usage
 
+### Compiler (ual)
+
 ```bash
 ual compile <file.ual>      # Compile to Go source (.go)
 ual build <file.ual>        # Compile to executable binary
@@ -238,9 +244,30 @@ ual help                    # Show help
 -q, --quiet                 # Suppress non-error output
 -v, --verbose               # Show detailed progress
 -vv, --debug                # Show debug information
--O, --optimize              # Use optimized dstack
+-O, --optimize              # Use optimised dstack
 --version                   # Show version and exit
 ```
+
+### Interpreter (iual)
+
+```bash
+iual <file.ual>             # Interpret directly
+iual run <file.ual>         # Same as above
+iual --trace <file.ual>     # Trace execution
+iual -q <file.ual>          # Quiet mode
+iual version                # Show version
+```
+
+### When to Use Which
+
+| Aspect | ual (compiler) | iual (interpreter) |
+|--------|----------------|-------------------|
+| Speed | Native Go performance | 10-50x slower |
+| Startup | Compile + link time | Immediate |
+| Debugging | Limited | `--trace` flag |
+| Use case | Production | Development, testing |
+
+Both tools produce identical results — they share the same runtime types and concurrency model.
 
 ## Examples
 

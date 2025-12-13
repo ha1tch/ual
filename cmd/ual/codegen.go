@@ -3,6 +3,8 @@ package main
 import (
 	"fmt"
 	"strings"
+
+	"github.com/ha1tch/ual/pkg/ast"
 )
 
 type CodeGen struct {
@@ -12,6 +14,7 @@ type CodeGen struct {
 	perspectives  map[string]string // stack name -> perspective (LIFO, FIFO, Indexed, Hash)
 	views         map[string]string // view name -> perspective
 	vars          map[string]bool   // declared variables
+	varOrder      []string          // order of variable declarations for auto-print
 	symbols       *SymbolTable      // variable symbol table
 	fnCounter     int
 	noForth       bool              // --no-forth flag
@@ -81,15 +84,15 @@ func (g *CodeGen) writeln(s string) {
 	g.out.WriteString("\n")
 }
 
-func (g *CodeGen) Generate(prog *Program) string {
+func (g *CodeGen) Generate(prog *ast.Program) string {
 	// Separate function declarations and stack declarations from other statements
-	var funcs []*FuncDecl
-	var stackDecls []*StackDecl
-	var otherStmts []Stmt
+	var funcs []*ast.FuncDecl
+	var stackDecls []*ast.StackDecl
+	var otherStmts []ast.Stmt
 	for _, stmt := range prog.Stmts {
-		if f, ok := stmt.(*FuncDecl); ok {
+		if f, ok := stmt.(*ast.FuncDecl); ok {
 			funcs = append(funcs, f)
-		} else if s, ok := stmt.(*StackDecl); ok {
+		} else if s, ok := stmt.(*ast.StackDecl); ok {
 			stackDecls = append(stackDecls, s)
 		} else {
 			otherStmts = append(otherStmts, stmt)
@@ -111,7 +114,7 @@ func (g *CodeGen) Generate(prog *Program) string {
 		g.writeln(`"unsafe"`)
 	}
 	g.writeln("")
-	g.writeln(`ual "github.com/ha1tch/ual"`)
+	g.writeln(`ual "github.com/ha1tch/ual/pkg/runtime"`)
 	g.indent--
 	g.writeln(")")
 	g.writeln("")
@@ -185,11 +188,11 @@ func (g *CodeGen) Generate(prog *Program) string {
 		g.generateStmt(stmt)
 	}
 	
-	// Print declared variables
-	if len(g.vars) > 0 && !g.optimize {
+	// Print declared variables (in order of declaration)
+	if len(g.varOrder) > 0 && !g.optimize {
 		g.writeln("")
 		g.writeln("// Results")
-		for name := range g.vars {
+		for _, name := range g.varOrder {
 			g.writeln(fmt.Sprintf(`fmt.Printf("%s = %%v\n", %s)`, name, name))
 		}
 	}
@@ -371,77 +374,77 @@ func (g *CodeGen) generateHelpers() {
 	g.writeln("")
 }
 
-func (g *CodeGen) generateStmt(stmt Stmt) {
+func (g *CodeGen) generateStmt(stmt ast.Stmt) {
 	switch s := stmt.(type) {
-	case *StackDecl:
+	case *ast.StackDecl:
 		g.generateStackDecl(s)
-	case *ViewDecl:
+	case *ast.ViewDecl:
 		g.generateViewDecl(s)
-	case *Assignment:
+	case *ast.Assignment:
 		g.generateAssignment(s)
-	case *StackOp:
+	case *ast.StackOp:
 		g.generateStackOp(s)
-	case *StackBlock:
+	case *ast.StackBlock:
 		g.generateStackBlock(s)
-	case *ViewOp:
+	case *ast.ViewOp:
 		g.generateViewOp(s)
-	case *VarDecl:
+	case *ast.VarDecl:
 		g.generateVarDecl(s)
-	case *LetAssign:
+	case *ast.LetAssign:
 		g.generateLetAssign(s)
-	case *IfStmt:
+	case *ast.IfStmt:
 		g.generateIfStmt(s)
-	case *WhileStmt:
+	case *ast.WhileStmt:
 		g.generateWhileStmt(s)
-	case *BreakStmt:
+	case *ast.BreakStmt:
 		g.writeln("break")
-	case *ContinueStmt:
+	case *ast.ContinueStmt:
 		g.writeln("continue")
-	case *ForStmt:
+	case *ast.ForStmt:
 		g.generateForStmt(s)
-	case *FuncDecl:
+	case *ast.FuncDecl:
 		g.generateFuncDecl(s)
-	case *FuncCall:
+	case *ast.FuncCall:
 		g.generateFuncCall(s)
-	case *ReturnStmt:
+	case *ast.ReturnStmt:
 		g.generateReturnStmt(s)
-	case *DeferStmt:
+	case *ast.DeferStmt:
 		g.generateDeferStmt(s)
-	case *PanicStmt:
+	case *ast.PanicStmt:
 		g.generatePanicStmt(s)
-	case *TryStmt:
+	case *ast.TryStmt:
 		g.generateTryStmt(s)
-	case *ErrorPush:
+	case *ast.ErrorPush:
 		g.generateErrorPush(s)
-	case *SpawnPush:
+	case *ast.SpawnPush:
 		g.generateSpawnPush(s)
-	case *SpawnOp:
+	case *ast.SpawnOp:
 		g.generateSpawnOp(s)
-	case *ConsiderStmt:
+	case *ast.ConsiderStmt:
 		g.generateConsiderStmt(s)
-	case *SelectStmt:
+	case *ast.SelectStmt:
 		g.generateSelectStmt(s)
-	case *ComputeStmt:
+	case *ast.ComputeStmt:
 		g.generateComputeStmt(s)
-	case *StatusStmt:
+	case *ast.StatusStmt:
 		g.generateStatusStmt(s)
-	case *Block:
+	case *ast.Block:
 		for _, stmt := range s.Stmts {
 			g.generateStmt(stmt)
 		}
-	case *ExprStmt:
+	case *ast.ExprStmt:
 		// Expression statement - evaluate and discard (or used as implicit return)
 		g.writeln(fmt.Sprintf("_ = %s", g.generateExpr(s.Expr)))
 	}
 }
 
-func (g *CodeGen) generateStackBlock(sb *StackBlock) {
+func (g *CodeGen) generateStackBlock(sb *ast.StackBlock) {
 	for _, op := range sb.Ops {
 		g.generateStmt(op)
 	}
 }
 
-func (g *CodeGen) generateStackDecl(s *StackDecl) {
+func (g *CodeGen) generateStackDecl(s *ast.StackDecl) {
 	elemType := g.mapElementType(s.ElementType)
 	persp := g.mapPerspective(s.Perspective)
 	
@@ -463,7 +466,7 @@ func (g *CodeGen) generateStackDecl(s *StackDecl) {
 }
 
 // generateGlobalStackDecl emits a stack declaration at file level using var syntax
-func (g *CodeGen) generateGlobalStackDecl(s *StackDecl) {
+func (g *CodeGen) generateGlobalStackDecl(s *ast.StackDecl) {
 	// Skip if already declared (handles redeclaration in source)
 	if g.stacks[s.Name] != "" {
 		return
@@ -484,7 +487,7 @@ func (g *CodeGen) generateGlobalStackDecl(s *StackDecl) {
 	}
 }
 
-func (g *CodeGen) generateViewDecl(v *ViewDecl) {
+func (g *CodeGen) generateViewDecl(v *ast.ViewDecl) {
 	persp := g.mapPerspective(v.Perspective)
 	
 	op := ":="
@@ -496,13 +499,17 @@ func (g *CodeGen) generateViewDecl(v *ViewDecl) {
 	g.writeln(fmt.Sprintf("view_%s %s ual.NewView(%s)", v.Name, op, persp))
 }
 
-func (g *CodeGen) generateAssignment(a *Assignment) {
+func (g *CodeGen) generateAssignment(a *ast.Assignment) {
+	// Track order for auto-print (only if new)
+	if !g.vars[a.Name] {
+		g.varOrder = append(g.varOrder, a.Name)
+	}
 	g.vars[a.Name] = true
 	exprCode := g.generateExpr(a.Expr)
 	g.writeln(fmt.Sprintf("%s := %s", a.Name, exprCode))
 }
 
-func (g *CodeGen) generateVarDecl(v *VarDecl) {
+func (g *CodeGen) generateVarDecl(v *ast.VarDecl) {
 	// Infer type if not specified
 	typ := v.Type
 	if typ == "" && len(v.Values) > 0 {
@@ -562,7 +569,7 @@ func (g *CodeGen) generateVarDecl(v *VarDecl) {
 	}
 }
 
-func (g *CodeGen) generateLetAssign(l *LetAssign) {
+func (g *CodeGen) generateLetAssign(l *ast.LetAssign) {
 	if g.optimize {
 		// Use native variables and native dstack
 		sym := g.symbols.Lookup(l.Name)
@@ -598,7 +605,7 @@ func (g *CodeGen) generateLetAssign(l *LetAssign) {
 	}
 }
 
-func (g *CodeGen) generateIfStmt(s *IfStmt) {
+func (g *CodeGen) generateIfStmt(s *ast.IfStmt) {
 	// Generate condition evaluation
 	condCode := g.generateCondition(s.Condition)
 	g.writeln(fmt.Sprintf("if %s {", condCode))
@@ -640,7 +647,7 @@ func (g *CodeGen) generateIfStmt(s *IfStmt) {
 	g.writeln("}")
 }
 
-func (g *CodeGen) generateWhileStmt(s *WhileStmt) {
+func (g *CodeGen) generateWhileStmt(s *ast.WhileStmt) {
 	condCode := g.generateCondition(s.Condition)
 	g.writeln(fmt.Sprintf("for %s {", condCode))
 	g.indent++
@@ -655,7 +662,7 @@ func (g *CodeGen) generateWhileStmt(s *WhileStmt) {
 	g.writeln("}")
 }
 
-func (g *CodeGen) generateForStmt(s *ForStmt) {
+func (g *CodeGen) generateForStmt(s *ast.ForStmt) {
 	stackName := s.Stack
 	
 	// Generate snapshot of stack (copy elements at iteration start)
@@ -717,7 +724,7 @@ func (g *CodeGen) generateForStmt(s *ForStmt) {
 	g.writeln("}")
 }
 
-func (g *CodeGen) generateFuncDecl(f *FuncDecl) {
+func (g *CodeGen) generateFuncDecl(f *ast.FuncDecl) {
 	// Build parameter list
 	var params []string
 	for _, p := range f.Params {
@@ -766,7 +773,17 @@ func (g *CodeGen) generateFuncDecl(f *FuncDecl) {
 	g.writeln("")
 }
 
-func (g *CodeGen) generateFuncCall(f *FuncCall) {
+func (g *CodeGen) generateFuncCall(f *ast.FuncCall) {
+	// Handle built-in functions
+	if f.Name == "print" {
+		var args []string
+		for _, arg := range f.Args {
+			args = append(args, g.generateExprValue(arg))
+		}
+		g.writeln(fmt.Sprintf("fmt.Println(%s)", strings.Join(args, ", ")))
+		return
+	}
+	
 	var args []string
 	for _, arg := range f.Args {
 		args = append(args, g.generateExprValue(arg))
@@ -774,7 +791,7 @@ func (g *CodeGen) generateFuncCall(f *FuncCall) {
 	g.writeln(fmt.Sprintf("%s(%s)", f.Name, strings.Join(args, ", ")))
 }
 
-func (g *CodeGen) generateReturnStmt(r *ReturnStmt) {
+func (g *CodeGen) generateReturnStmt(r *ast.ReturnStmt) {
 	if r.Value == nil {
 		g.writeln("return")
 	} else {
@@ -783,7 +800,7 @@ func (g *CodeGen) generateReturnStmt(r *ReturnStmt) {
 	}
 }
 
-func (g *CodeGen) generateDeferStmt(d *DeferStmt) {
+func (g *CodeGen) generateDeferStmt(d *ast.DeferStmt) {
 	g.writeln("defer func() {")
 	g.indent++
 	
@@ -795,7 +812,7 @@ func (g *CodeGen) generateDeferStmt(d *DeferStmt) {
 	g.writeln("}()")
 }
 
-func (g *CodeGen) generatePanicStmt(p *PanicStmt) {
+func (g *CodeGen) generatePanicStmt(p *ast.PanicStmt) {
 	if p.Value == nil {
 		// Bare panic - re-panic with recovered value
 		// This should only be used inside a recover context
@@ -806,7 +823,7 @@ func (g *CodeGen) generatePanicStmt(p *PanicStmt) {
 	}
 }
 
-func (g *CodeGen) generateTryStmt(t *TryStmt) {
+func (g *CodeGen) generateTryStmt(t *ast.TryStmt) {
 	// Generate try/catch/finally using Go's defer/recover pattern
 	//
 	// try { body } catch |err| { handler } finally { cleanup }
@@ -883,7 +900,7 @@ func (g *CodeGen) generateTryStmt(t *TryStmt) {
 	g.writeln("}()")
 }
 
-func (g *CodeGen) generateConsiderStmt(c *ConsiderStmt) {
+func (g *CodeGen) generateConsiderStmt(c *ast.ConsiderStmt) {
 	// Generate consider block with status matching
 	//
 	// @stack { ops }.consider(
@@ -982,10 +999,10 @@ func (g *CodeGen) generateConsiderStmt(c *ConsiderStmt) {
 		
 		// Bind value to variables if requested
 		if len(cas.Bindings) > 0 {
-			// For single binding, bind the value with type assertion
+			// For single binding, bind the value
 			if len(cas.Bindings) == 1 {
 				bindName := cas.Bindings[0]
-				// Generate type switch to extract the appropriate type
+				// Try to extract as int64, fall back to 0
 				g.writeln(fmt.Sprintf("var %s int64", bindName))
 				g.writeln("switch _v := _consider_value.(type) {")
 				g.writeln("case int64:")
@@ -1001,13 +1018,27 @@ func (g *CodeGen) generateConsiderStmt(c *ConsiderStmt) {
 				g.writeln(fmt.Sprintf("fmt.Sscanf(_v, \"%%d\", &%s)", bindName))
 				g.indent--
 				g.writeln("}")
+				// Also create string version for string operations
+				g.writeln(fmt.Sprintf("%s_str := fmt.Sprint(_consider_value)", bindName))
 				g.writeln(fmt.Sprintf("_ = %s // suppress unused", bindName))
+				g.writeln(fmt.Sprintf("_ = %s_str // suppress unused", bindName))
 			} else {
 				// For multiple bindings, we'd need tuple unpacking
 				// For now, just bind first to value
-				g.writeln(fmt.Sprintf("%s := _consider_value", cas.Bindings[0]))
+				g.writeln(fmt.Sprintf("var %s int64", cas.Bindings[0]))
+				g.writeln("switch _v := _consider_value.(type) {")
+				g.writeln("case int64:")
+				g.indent++
+				g.writeln(fmt.Sprintf("%s = _v", cas.Bindings[0]))
+				g.indent--
+				g.writeln("case int:")
+				g.indent++
+				g.writeln(fmt.Sprintf("%s = int64(_v)", cas.Bindings[0]))
+				g.indent--
+				g.writeln("}")
+				g.writeln(fmt.Sprintf("%s_str := fmt.Sprint(_consider_value)", cas.Bindings[0]))
 				for i := 1; i < len(cas.Bindings); i++ {
-					g.writeln(fmt.Sprintf("var %s interface{} // additional binding", cas.Bindings[i]))
+					g.writeln(fmt.Sprintf("var %s int64 // additional binding", cas.Bindings[i]))
 				}
 			}
 		}
@@ -1039,7 +1070,7 @@ func (g *CodeGen) generateConsiderStmt(c *ConsiderStmt) {
 	g.writeln("}()")
 }
 
-func (g *CodeGen) generateStatusStmt(s *StatusStmt) {
+func (g *CodeGen) generateStatusStmt(s *ast.StatusStmt) {
 	// status:label or status:label(value)
 	// Sets the global status variable
 	
@@ -1051,7 +1082,7 @@ func (g *CodeGen) generateStatusStmt(s *StatusStmt) {
 	}
 }
 
-func (g *CodeGen) generateSelectStmt(s *SelectStmt) {
+func (g *CodeGen) generateSelectStmt(s *ast.SelectStmt) {
 	// Generate select block with concurrent waits on multiple stacks
 	//
 	// @inbox {
@@ -1250,7 +1281,7 @@ func (g *CodeGen) generateSelectStmt(s *SelectStmt) {
 }
 
 // generateSelectSwitch generates the switch statement for handling select results
-func (g *CodeGen) generateSelectSwitch(s *SelectStmt, selectID int) {
+func (g *CodeGen) generateSelectSwitch(s *ast.SelectStmt, selectID int) {
 	g.writeln("switch _result.caseID {")
 	
 	caseID := 0
@@ -1282,9 +1313,9 @@ func (g *CodeGen) generateSelectSwitch(s *SelectStmt, selectID int) {
 }
 
 // checkSelectControlFlow checks if handler contains retry() or restart()
-func (g *CodeGen) checkSelectControlFlow(stmts []Stmt) (hasRetry, hasRestart bool) {
+func (g *CodeGen) checkSelectControlFlow(stmts []ast.Stmt) (hasRetry, hasRestart bool) {
 	for _, stmt := range stmts {
-		if fc, ok := stmt.(*FuncCall); ok {
+		if fc, ok := stmt.(*ast.FuncCall); ok {
 			if fc.Name == "retry" {
 				hasRetry = true
 			} else if fc.Name == "restart" {
@@ -1297,8 +1328,8 @@ func (g *CodeGen) checkSelectControlFlow(stmts []Stmt) (hasRetry, hasRestart boo
 
 // generateSelectHandlerStmt generates a statement inside a select timeout handler
 // Replaces retry() with goto and restart() with return to outer loop
-func (g *CodeGen) generateSelectHandlerStmt(stmt Stmt, selectID, caseIdx int, hasRetry, hasRestart bool) {
-	if fc, ok := stmt.(*FuncCall); ok {
+func (g *CodeGen) generateSelectHandlerStmt(stmt ast.Stmt, selectID, caseIdx int, hasRetry, hasRestart bool) {
+	if fc, ok := stmt.(*ast.FuncCall); ok {
 		if fc.Name == "retry" {
 			g.writeln(fmt.Sprintf("goto _retry%d_%d", selectID, caseIdx))
 			return
@@ -1320,7 +1351,7 @@ func (g *CodeGen) generateSelectHandlerStmt(stmt Stmt, selectID, caseIdx int, ha
 //   4. Execute compute body with infix math
 //   5. Push results back
 //   6. Unlock
-func (g *CodeGen) generateComputeStmt(c *ComputeStmt) {
+func (g *CodeGen) generateComputeStmt(c *ast.ComputeStmt) {
 	stackVar := "stack_" + c.StackName
 
 	// Get the stack's element type and perspective
@@ -1385,7 +1416,7 @@ func (g *CodeGen) generateComputeStmt(c *ComputeStmt) {
 }
 
 // collectMemberIndexExprs analyzes the AST and returns unique property names accessed via self.prop[i]
-func (g *CodeGen) collectMemberIndexExprs(stmts []Stmt) map[string]bool {
+func (g *CodeGen) collectMemberIndexExprs(stmts []ast.Stmt) map[string]bool {
 	result := make(map[string]bool)
 	for _, stmt := range stmts {
 		g.collectMemberIndexExprsStmt(stmt, result)
@@ -1393,25 +1424,25 @@ func (g *CodeGen) collectMemberIndexExprs(stmts []Stmt) map[string]bool {
 	return result
 }
 
-func (g *CodeGen) collectMemberIndexExprsStmt(stmt Stmt, result map[string]bool) {
+func (g *CodeGen) collectMemberIndexExprsStmt(stmt ast.Stmt, result map[string]bool) {
 	switch s := stmt.(type) {
-	case *VarDecl:
+	case *ast.VarDecl:
 		for _, v := range s.Values {
 			g.collectMemberIndexExprsExpr(v, result)
 		}
-	case *AssignStmt:
+	case *ast.AssignStmt:
 		g.collectMemberIndexExprsExpr(s.Value, result)
-	case *IndexedAssignStmt:
+	case *ast.IndexedAssignStmt:
 		if s.Member != "" {
 			result[s.Member] = true
 		}
 		g.collectMemberIndexExprsExpr(s.Index, result)
 		g.collectMemberIndexExprsExpr(s.Value, result)
-	case *ReturnStmt:
+	case *ast.ReturnStmt:
 		for _, v := range s.Values {
 			g.collectMemberIndexExprsExpr(v, result)
 		}
-	case *IfStmt:
+	case *ast.IfStmt:
 		g.collectMemberIndexExprsExpr(s.Condition, result)
 		for _, bodyStmt := range s.Body {
 			g.collectMemberIndexExprsStmt(bodyStmt, result)
@@ -1419,60 +1450,60 @@ func (g *CodeGen) collectMemberIndexExprsStmt(stmt Stmt, result map[string]bool)
 		for _, elseStmt := range s.Else {
 			g.collectMemberIndexExprsStmt(elseStmt, result)
 		}
-	case *WhileStmt:
+	case *ast.WhileStmt:
 		g.collectMemberIndexExprsExpr(s.Condition, result)
 		for _, bodyStmt := range s.Body {
 			g.collectMemberIndexExprsStmt(bodyStmt, result)
 		}
-	case *ExprStmt:
+	case *ast.ExprStmt:
 		g.collectMemberIndexExprsExpr(s.Expr, result)
 	}
 }
 
-func (g *CodeGen) collectMemberIndexExprsExpr(expr Expr, result map[string]bool) {
+func (g *CodeGen) collectMemberIndexExprsExpr(expr ast.Expr, result map[string]bool) {
 	switch e := expr.(type) {
-	case *MemberIndexExpr:
+	case *ast.MemberIndexExpr:
 		result[e.Member] = true
 		g.collectMemberIndexExprsExpr(e.Index, result)
-	case *BinaryExpr:
+	case *ast.BinaryExpr:
 		g.collectMemberIndexExprsExpr(e.Left, result)
 		g.collectMemberIndexExprsExpr(e.Right, result)
-	case *UnaryExpr:
+	case *ast.UnaryExpr:
 		g.collectMemberIndexExprsExpr(e.Operand, result)
-	case *CallExpr:
+	case *ast.CallExpr:
 		for _, arg := range e.Args {
 			g.collectMemberIndexExprsExpr(arg, result)
 		}
-	case *IndexExpr:
+	case *ast.IndexExpr:
 		g.collectMemberIndexExprsExpr(e.Index, result)
 	}
 }
 
 // generateComputeBodyStmt: handles statements inside compute block
-func (g *CodeGen) generateComputeBodyStmt(stmt Stmt, stackName, elemType, goType string) {
+func (g *CodeGen) generateComputeBodyStmt(stmt ast.Stmt, stackName, elemType, goType string) {
 	g.generateComputeBodyStmtWithPerspective(stmt, stackName, elemType, goType, false)
 }
 
 // generateComputeBodyStmtWithPerspective: handles statements with perspective awareness
-func (g *CodeGen) generateComputeBodyStmtWithPerspective(stmt Stmt, stackName, elemType, goType string, isHash bool) {
+func (g *CodeGen) generateComputeBodyStmtWithPerspective(stmt ast.Stmt, stackName, elemType, goType string, isHash bool) {
 	stackVar := "stack_" + stackName
 
 	switch s := stmt.(type) {
-	case *VarDecl:
+	case *ast.VarDecl:
 		// var x = expr  ->  var x goType = expr
 		if len(s.Names) > 0 && len(s.Values) > 0 {
 			g.writeln(fmt.Sprintf("var %s %s = %s", s.Names[0], goType, g.generateComputeExpr(s.Values[0], stackName, elemType, goType)))
 		}
 
-	case *ArrayDecl:
+	case *ast.ArrayDecl:
 		// var buf[1024]  ->  var buf [1024]goType
 		g.writeln(fmt.Sprintf("var %s [%d]%s", s.Name, s.Size, goType))
 
-	case *AssignStmt:
+	case *ast.AssignStmt:
 		// x = expr
 		g.writeln(fmt.Sprintf("%s = %s", s.Name, g.generateComputeExpr(s.Value, stackName, elemType, goType)))
 
-	case *IndexedAssignStmt:
+	case *ast.IndexedAssignStmt:
 		// buf[i] = expr  ->  buf[i] = expr
 		indexStr := g.generateComputeExpr(s.Index, stackName, elemType, goType)
 		valueStr := g.generateComputeExpr(s.Value, stackName, elemType, goType)
@@ -1484,7 +1515,7 @@ func (g *CodeGen) generateComputeBodyStmtWithPerspective(stmt Stmt, stackName, e
 			g.writeln(fmt.Sprintf("%s[int(%s)] = %s", s.Target, indexStr, valueStr))
 		}
 
-	case *ReturnStmt:
+	case *ast.ReturnStmt:
 		// return a, b  ->  push each value
 		// For Hash stacks: use SetRaw with "__result_N__" keys
 		for i, val := range s.Values {
@@ -1498,7 +1529,7 @@ func (g *CodeGen) generateComputeBodyStmtWithPerspective(stmt Stmt, stackName, e
 		}
 		g.writeln("return")
 
-	case *IfStmt:
+	case *ast.IfStmt:
 		condStr := g.generateComputeExpr(s.Condition, stackName, elemType, goType)
 		g.writeln(fmt.Sprintf("if %s {", condStr))
 		g.indent++
@@ -1516,7 +1547,7 @@ func (g *CodeGen) generateComputeBodyStmtWithPerspective(stmt Stmt, stackName, e
 		}
 		g.writeln("}")
 
-	case *WhileStmt:
+	case *ast.WhileStmt:
 		condStr := g.generateComputeExpr(s.Condition, stackName, elemType, goType)
 		g.writeln(fmt.Sprintf("for %s {", condStr))
 		g.indent++
@@ -1526,7 +1557,7 @@ func (g *CodeGen) generateComputeBodyStmtWithPerspective(stmt Stmt, stackName, e
 		g.indent--
 		g.writeln("}")
 
-	case *ExprStmt:
+	case *ast.ExprStmt:
 		g.writeln(fmt.Sprintf("_ = %s", g.generateComputeExpr(s.Expr, stackName, elemType, goType)))
 
 	default:
@@ -1536,15 +1567,15 @@ func (g *CodeGen) generateComputeBodyStmtWithPerspective(stmt Stmt, stackName, e
 }
 
 // generateComputeExpr: generates infix expressions for compute block
-func (g *CodeGen) generateComputeExpr(expr Expr, stackName, elemType, goType string) string {
+func (g *CodeGen) generateComputeExpr(expr ast.Expr, stackName, elemType, goType string) string {
 	switch e := expr.(type) {
-	case *IntLit:
+	case *ast.IntLit:
 		if elemType == "f64" || elemType == "float64" {
 			return fmt.Sprintf("float64(%d)", e.Value)
 		}
 		return fmt.Sprintf("%d", e.Value)
 
-	case *FloatLit:
+	case *ast.FloatLit:
 		// Always format with decimal to ensure Go sees it as float64
 		s := fmt.Sprintf("%v", e.Value)
 		if !strings.Contains(s, ".") && !strings.Contains(s, "e") {
@@ -1552,30 +1583,30 @@ func (g *CodeGen) generateComputeExpr(expr Expr, stackName, elemType, goType str
 		}
 		return s
 
-	case *StringLit:
+	case *ast.StringLit:
 		return fmt.Sprintf("%q", e.Value)
 
-	case *BoolLit:
+	case *ast.BoolLit:
 		if e.Value {
 			return "true"
 		}
 		return "false"
 
-	case *Ident:
+	case *ast.Ident:
 		return e.Name
 
-	case *MemberExpr:
+	case *ast.MemberExpr:
 		// self.mass -> lookup from stack's hash storage
 		stackVar := "stack_" + stackName
 		return fmt.Sprintf("func() %s { _b, _ok := %s.GetRaw(%q); if !_ok { panic(\"compute: key '%s' not found\") }; return %s }()",
 			goType, stackVar, e.Member, e.Member, g.bytesToNative("_b", elemType))
 
-	case *MemberIndexExpr:
+	case *ast.MemberIndexExpr:
 		// self.pixels[i] -> read from pre-generated view
 		indexCode := g.generateComputeExpr(e.Index, stackName, elemType, goType)
 		return fmt.Sprintf("_view_%s[int(%s)]", e.Member, indexCode)
 
-	case *IndexExpr:
+	case *ast.IndexExpr:
 		indexCode := g.generateComputeExpr(e.Index, stackName, elemType, goType)
 		if e.Target == "self" {
 			// self[i] -> lookup from stack's indexed storage
@@ -1586,16 +1617,16 @@ func (g *CodeGen) generateComputeExpr(expr Expr, stackName, elemType, goType str
 		// buf[i] -> direct local array access
 		return fmt.Sprintf("%s[int(%s)]", e.Target, indexCode)
 
-	case *BinaryExpr:
+	case *ast.BinaryExpr:
 		left := g.generateComputeExpr(e.Left, stackName, elemType, goType)
 		right := g.generateComputeExpr(e.Right, stackName, elemType, goType)
 		return fmt.Sprintf("(%s %s %s)", left, e.Op, right)
 
-	case *UnaryExpr:
+	case *ast.UnaryExpr:
 		operand := g.generateComputeExpr(e.Operand, stackName, elemType, goType)
 		return fmt.Sprintf("(%s%s)", e.Op, operand)
 
-	case *CallExpr:
+	case *ast.CallExpr:
 		// Auto-prefix common math functions
 		fn := e.Fn
 		mathFuncs := map[string]bool{
@@ -1695,13 +1726,13 @@ func (g *CodeGen) getStackElementType(stackName string) string {
 	return "f64"
 }
 
-func (g *CodeGen) generateErrorPush(e *ErrorPush) {
+func (g *CodeGen) generateErrorPush(e *ast.ErrorPush) {
 	// Push error message to @error stack
 	msg := g.generateExprValue(e.Message)
 	g.writeln(fmt.Sprintf("stack_error.Push([]byte(%s))", msg))
 }
 
-func (g *CodeGen) generateSpawnPush(s *SpawnPush) {
+func (g *CodeGen) generateSpawnPush(s *ast.SpawnPush) {
 	// Generate closure and add to spawn_tasks
 	g.writeln("spawn_mu.Lock()")
 	g.writeln("spawn_tasks = append(spawn_tasks, func() {")
@@ -1717,7 +1748,7 @@ func (g *CodeGen) generateSpawnPush(s *SpawnPush) {
 	g.writeln("spawn_mu.Unlock()")
 }
 
-func (g *CodeGen) generateSpawnOp(s *SpawnOp) {
+func (g *CodeGen) generateSpawnOp(s *ast.SpawnOp) {
 	switch s.Op {
 	case "peek":
 		if s.Play {
@@ -1813,15 +1844,15 @@ func (g *CodeGen) goTypeFor(ualType string) string {
 	}
 }
 
-func (g *CodeGen) generateExprValue(expr Expr) string {
+func (g *CodeGen) generateExprValue(expr ast.Expr) string {
 	switch e := expr.(type) {
-	case *IntLit:
+	case *ast.IntLit:
 		return fmt.Sprintf("%d", e.Value)
-	case *FloatLit:
+	case *ast.FloatLit:
 		return fmt.Sprintf("%f", e.Value)
-	case *StringLit:
+	case *ast.StringLit:
 		return fmt.Sprintf("%q", e.Value)
-	case *Ident:
+	case *ast.Ident:
 		// Check if it's a variable
 		if sym := g.symbols.Lookup(e.Name); sym != nil {
 			if g.optimize && sym.Native {
@@ -1832,14 +1863,25 @@ func (g *CodeGen) generateExprValue(expr Expr) string {
 				typeStack, sym.Index)
 		}
 		return e.Name
-	case *BinaryOp:
+	case *ast.BinaryOp:
 		left := g.generateExprValue(e.Left)
 		right := g.generateExprValue(e.Right)
+		// Handle string concatenation: "str" + var -> "str" + fmt.Sprint(var)
+		if e.Op == "+" {
+			_, leftIsStr := e.Left.(*ast.StringLit)
+			_, rightIsStr := e.Right.(*ast.StringLit)
+			if leftIsStr && !rightIsStr {
+				return fmt.Sprintf("(%s + fmt.Sprint(%s))", left, right)
+			}
+			if rightIsStr && !leftIsStr {
+				return fmt.Sprintf("(fmt.Sprint(%s) + %s)", left, right)
+			}
+		}
 		return fmt.Sprintf("(%s %s %s)", left, e.Op, right)
-	case *UnaryExpr:
+	case *ast.UnaryExpr:
 		operand := g.generateExprValue(e.Operand)
 		return fmt.Sprintf("(%s%s)", e.Op, operand)
-	case *FuncCall:
+	case *ast.FuncCall:
 		var args []string
 		for _, arg := range e.Args {
 			args = append(args, g.generateExprValue(arg))
@@ -1850,13 +1892,13 @@ func (g *CodeGen) generateExprValue(expr Expr) string {
 	}
 }
 
-func (g *CodeGen) generateCondition(cond Expr) string {
+func (g *CodeGen) generateCondition(cond ast.Expr) string {
 	switch c := cond.(type) {
-	case *BinaryExpr:
+	case *ast.BinaryExpr:
 		left := g.generateCondExpr(c.Left)
 		right := g.generateCondExpr(c.Right)
 		return fmt.Sprintf("%s %s %s", left, c.Op, right)
-	case *Ident:
+	case *ast.Ident:
 		// Truthy check - look up variable
 		if sym := g.symbols.Lookup(c.Name); sym != nil {
 			typeStack := TypeStack(sym.Type)
@@ -1864,22 +1906,22 @@ func (g *CodeGen) generateCondition(cond Expr) string {
 				typeStack, sym.Index)
 		}
 		return "false"
-	case *IntLit:
+	case *ast.IntLit:
 		return fmt.Sprintf("%d != 0", c.Value)
 	default:
 		return "true"
 	}
 }
 
-func (g *CodeGen) generateCondExpr(expr Expr) string {
+func (g *CodeGen) generateCondExpr(expr ast.Expr) string {
 	switch e := expr.(type) {
-	case *IntLit:
+	case *ast.IntLit:
 		return fmt.Sprintf("int64(%d)", e.Value)
-	case *FloatLit:
+	case *ast.FloatLit:
 		return fmt.Sprintf("%f", e.Value)
-	case *StringLit:
+	case *ast.StringLit:
 		return fmt.Sprintf("%q", e.Value)
-	case *Ident:
+	case *ast.Ident:
 		if sym := g.symbols.Lookup(e.Name); sym != nil {
 			if g.optimize && sym.Native {
 				return fmt.Sprintf("var_%s", e.Name)
@@ -1894,20 +1936,20 @@ func (g *CodeGen) generateCondExpr(expr Expr) string {
 	}
 }
 
-func (g *CodeGen) inferType(expr Expr) string {
+func (g *CodeGen) inferType(expr ast.Expr) string {
 	switch e := expr.(type) {
-	case *IntLit:
+	case *ast.IntLit:
 		return "i64"
-	case *FloatLit:
+	case *ast.FloatLit:
 		return "f64"
-	case *StringLit:
+	case *ast.StringLit:
 		return "string"
-	case *BoolLit:
+	case *ast.BoolLit:
 		return "bool"
-	case *UnaryExpr:
+	case *ast.UnaryExpr:
 		// For unary minus, the type is the operand's type
 		return g.inferType(e.Operand)
-	case *Ident:
+	case *ast.Ident:
 		// Look up existing variable
 		if sym := g.symbols.Lookup(e.Name); sym != nil {
 			return sym.Type
@@ -1990,7 +2032,7 @@ func (g *CodeGen) wrapValueForType(value string, typ string) string {
 	}
 }
 
-func (g *CodeGen) generateStackOp(s *StackOp) {
+func (g *CodeGen) generateStackOp(s *ast.StackOp) {
 	// Check if we're using native dstack in optimized mode
 	nativeDstack := g.optimize && s.Stack == "dstack"
 	
@@ -1998,7 +2040,7 @@ func (g *CodeGen) generateStackOp(s *StackOp) {
 	case "push":
 		if len(s.Args) >= 1 {
 			// Check if pushing a variable
-			if ident, ok := s.Args[0].(*Ident); ok {
+			if ident, ok := s.Args[0].(*ast.Ident); ok {
 				if sym := g.symbols.Lookup(ident.Name); sym != nil {
 					if g.optimize && sym.Native && nativeDstack {
 						// Native var to native dstack
@@ -2025,13 +2067,13 @@ func (g *CodeGen) generateStackOp(s *StackOp) {
 			elemType := g.stacks[s.Stack]
 			
 			// Check if pushing float literal to integer stack
-			if _, isFloat := s.Args[0].(*FloatLit); isFloat && !isFloatType(elemType) {
+			if _, isFloat := s.Args[0].(*ast.FloatLit); isFloat && !isFloatType(elemType) {
 				g.addError(fmt.Sprintf("cannot push float literal to %s stack", elemType))
 				return
 			}
 			// Check if pushing float via unary minus to integer stack
-			if unary, isUnary := s.Args[0].(*UnaryExpr); isUnary {
-				if _, isFloat := unary.Operand.(*FloatLit); isFloat && !isFloatType(elemType) {
+			if unary, isUnary := s.Args[0].(*ast.UnaryExpr); isUnary {
+				if _, isFloat := unary.Operand.(*ast.FloatLit); isFloat && !isFloatType(elemType) {
 					g.addError(fmt.Sprintf("cannot push float literal to %s stack", elemType))
 					return
 				}
@@ -2054,7 +2096,7 @@ func (g *CodeGen) generateStackOp(s *StackOp) {
 			
 			// Key must be a string literal
 			keyStr := ""
-			if lit, ok := keyExpr.(*StringLit); ok {
+			if lit, ok := keyExpr.(*ast.StringLit); ok {
 				keyStr = lit.Value
 			} else {
 				g.writeln(fmt.Sprintf("// Error: set requires string literal key"))
@@ -2080,7 +2122,7 @@ func (g *CodeGen) generateStackOp(s *StackOp) {
 			
 			// Key must be a string literal
 			keyStr := ""
-			if lit, ok := keyExpr.(*StringLit); ok {
+			if lit, ok := keyExpr.(*ast.StringLit); ok {
 				keyStr = lit.Value
 			} else {
 				g.writeln(fmt.Sprintf("// Error: get requires string literal key"))
@@ -2263,7 +2305,15 @@ func (g *CodeGen) generateStackOp(s *StackOp) {
 	
 	// I/O operations
 	case "print":
-		if nativeDstack {
+		if len(s.Args) > 0 {
+			// print(args) - print the arguments
+			var args []string
+			for _, arg := range s.Args {
+				args = append(args, g.generateExprValue(arg))
+			}
+			g.writeln(fmt.Sprintf("fmt.Println(%s)", strings.Join(args, ", ")))
+		} else if nativeDstack {
+			// Forth-style: peek and print
 			g.writeln("fmt.Println(_peek())")
 		} else {
 			// Use correct conversion based on stack element type
@@ -2414,7 +2464,7 @@ func (g *CodeGen) generateStackOp(s *StackOp) {
 	case "let":
 		// let:name - assign from stack top to variable
 		if len(s.Args) >= 1 {
-			if ident, ok := s.Args[0].(*Ident); ok {
+			if ident, ok := s.Args[0].(*ast.Ident); ok {
 				name := ident.Name
 				sym := g.symbols.Lookup(name)
 				
@@ -2477,11 +2527,11 @@ func (g *CodeGen) generateBinaryStackOp(stackName string, op string) {
 		stackName, stackName, stackName, op))
 }
 
-func (g *CodeGen) generateViewOp(v *ViewOp) {
+func (g *CodeGen) generateViewOp(v *ast.ViewOp) {
 	switch v.Op {
 	case "attach":
 		if len(v.Args) >= 1 {
-			if ref, ok := v.Args[0].(*StackRef); ok {
+			if ref, ok := v.Args[0].(*ast.StackRef); ok {
 				g.writeln(fmt.Sprintf("view_%s.Attach(stack_%s)", v.View, ref.Name))
 			}
 		}
@@ -2500,21 +2550,21 @@ func (g *CodeGen) generateViewOp(v *ViewOp) {
 	}
 }
 
-func (g *CodeGen) generateExpr(expr Expr) string {
+func (g *CodeGen) generateExpr(expr ast.Expr) string {
 	switch e := expr.(type) {
-	case *IntLit:
+	case *ast.IntLit:
 		return fmt.Sprintf("%d", e.Value)
 		
-	case *FloatLit:
+	case *ast.FloatLit:
 		return fmt.Sprintf("%f", e.Value)
 		
-	case *StringLit:
+	case *ast.StringLit:
 		return fmt.Sprintf("%q", e.Value)
 		
-	case *StackRef:
+	case *ast.StackRef:
 		return fmt.Sprintf("stack_%s", e.Name)
 		
-	case *Ident:
+	case *ast.Ident:
 		if _, isView := g.views[e.Name]; isView {
 			return fmt.Sprintf("view_%s", e.Name)
 		}
@@ -2529,31 +2579,31 @@ func (g *CodeGen) generateExpr(expr Expr) string {
 		}
 		return e.Name
 		
-	case *PerspectiveLit:
+	case *ast.PerspectiveLit:
 		return g.mapPerspective(e.Value)
 		
-	case *TypeLit:
+	case *ast.TypeLit:
 		return g.mapElementType(e.Value)
 		
-	case *BinaryOp:
+	case *ast.BinaryOp:
 		left := g.generateExpr(e.Left)
 		right := g.generateExpr(e.Right)
 		return fmt.Sprintf("(%s %s %s)", left, e.Op, right)
 		
-	case *UnaryExpr:
+	case *ast.UnaryExpr:
 		operand := g.generateExpr(e.Operand)
 		return fmt.Sprintf("(%s%s)", e.Op, operand)
 		
-	case *StackExpr:
+	case *ast.StackExpr:
 		return g.generateStackExpr(e)
 		
-	case *ViewExpr:
+	case *ast.ViewExpr:
 		return g.generateViewExpr(e)
 		
-	case *FnLit:
+	case *ast.FnLit:
 		return g.generateFnLit(e)
 		
-	case *FuncCall:
+	case *ast.FuncCall:
 		var args []string
 		for _, arg := range e.Args {
 			args = append(args, g.generateExpr(arg))
@@ -2565,7 +2615,7 @@ func (g *CodeGen) generateExpr(expr Expr) string {
 	}
 }
 
-func (g *CodeGen) generateStackExpr(e *StackExpr) string {
+func (g *CodeGen) generateStackExpr(e *ast.StackExpr) string {
 	elemType := g.stacks[e.Stack]
 	
 	switch e.Op {
@@ -2599,7 +2649,7 @@ func (g *CodeGen) generateStackExpr(e *StackExpr) string {
 	return "nil"
 }
 
-func (g *CodeGen) generateViewExpr(e *ViewExpr) string {
+func (g *CodeGen) generateViewExpr(e *ast.ViewExpr) string {
 	switch e.Op {
 	case "pop":
 		return fmt.Sprintf("func() int64 { v, _ := view_%s.Pop(); return bytesToInt(v) }()", e.View)
@@ -2614,16 +2664,16 @@ func (g *CodeGen) generateViewExpr(e *ViewExpr) string {
 	return "nil"
 }
 
-func (g *CodeGen) generateFnLit(f *FnLit) string {
+func (g *CodeGen) generateFnLit(f *ast.FnLit) string {
 	g.fnCounter++
 	
 	// Check if this is a simple expression (ExprStmt wrapping an expression)
 	// Used for map/filter/reduce
 	if len(f.Body) == 1 {
-		if exprStmt, ok := f.Body[0].(*ExprStmt); ok {
+		if exprStmt, ok := f.Body[0].(*ast.ExprStmt); ok {
 			return g.generateExprFnLit(f.Params, exprStmt.Expr)
 		}
-		if stackOp, ok := f.Body[0].(*StackOp); ok {
+		if stackOp, ok := f.Body[0].(*ast.StackOp); ok {
 			// Simple stack operation - generate as expression
 			return g.generateSimpleFnLit(f.Params, stackOp)
 		}
@@ -2635,7 +2685,7 @@ func (g *CodeGen) generateFnLit(f *FnLit) string {
 }
 
 // generateExprFnLit handles expression-only codeblocks like {|a,b| a + b}
-func (g *CodeGen) generateExprFnLit(params []string, expr Expr) string {
+func (g *CodeGen) generateExprFnLit(params []string, expr ast.Expr) string {
 	if len(params) == 1 {
 		param := params[0]
 		body := g.generateExprWithParams(expr, params)
@@ -2652,13 +2702,13 @@ func (g *CodeGen) generateExprFnLit(params []string, expr Expr) string {
 }
 
 // generateExprWithParams generates Go code for an expression, using given param names
-func (g *CodeGen) generateExprWithParams(expr Expr, params []string) string {
+func (g *CodeGen) generateExprWithParams(expr ast.Expr, params []string) string {
 	switch e := expr.(type) {
-	case *IntLit:
+	case *ast.IntLit:
 		return fmt.Sprintf("%d", e.Value)
-	case *Ident:
+	case *ast.Ident:
 		return e.Name
-	case *BinaryOp:
+	case *ast.BinaryOp:
 		left := g.generateExprWithParams(e.Left, params)
 		right := g.generateExprWithParams(e.Right, params)
 		return fmt.Sprintf("(%s %s %s)", left, e.Op, right)
@@ -2668,7 +2718,7 @@ func (g *CodeGen) generateExprWithParams(expr Expr, params []string) string {
 }
 
 // generateSimpleFnLit handles simple codeblocks like {|x| x * 2}
-func (g *CodeGen) generateSimpleFnLit(params []string, op *StackOp) string {
+func (g *CodeGen) generateSimpleFnLit(params []string, op *ast.StackOp) string {
 	if len(params) == 1 {
 		param := params[0]
 		// Build expression from stack operation
@@ -2686,7 +2736,7 @@ func (g *CodeGen) generateSimpleFnLit(params []string, op *StackOp) string {
 }
 
 // generateComplexFnLit handles codeblocks with multiple statements
-func (g *CodeGen) generateComplexFnLit(params []string, body []Stmt) string {
+func (g *CodeGen) generateComplexFnLit(params []string, body []ast.Stmt) string {
 	// For now, generate a closure that executes statements
 	// Parameters are bound as local variables
 	
@@ -2701,7 +2751,7 @@ func (g *CodeGen) generateComplexFnLit(params []string, body []Stmt) string {
 }
 
 // generateStackOpExpr converts a stack operation to an expression
-func (g *CodeGen) generateStackOpExpr(op *StackOp, params ...string) string {
+func (g *CodeGen) generateStackOpExpr(op *ast.StackOp, params ...string) string {
 	switch op.Op {
 	case "mul":
 		if len(op.Args) >= 1 {
@@ -2730,10 +2780,10 @@ func (g *CodeGen) generateStackOpExpr(op *StackOp, params ...string) string {
 	}
 }
 
-func (g *CodeGen) generateFnBody(body []Stmt, params ...string) string {
+func (g *CodeGen) generateFnBody(body []ast.Stmt, params ...string) string {
 	// For simple bodies, try to extract expression
 	if len(body) == 1 {
-		if stackOp, ok := body[0].(*StackOp); ok {
+		if stackOp, ok := body[0].(*ast.StackOp); ok {
 			return g.generateStackOpExpr(stackOp, params...)
 		}
 	}

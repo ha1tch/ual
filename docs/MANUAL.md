@@ -44,11 +44,13 @@ make build
 ./build.sh
 
 # Or manually:
-cd cmd/ual
-go build -o ual
+go build -o ual ./cmd/ual
+go build -o iual ./cmd/iual
 ```
 
 ## Usage
+
+### Compiler (ual)
 
 ```bash
 # Commands
@@ -65,7 +67,7 @@ ual help                    # Show help
 -q, --quiet                 # Suppress non-error output
 -v, --verbose               # Show detailed compilation info
 -vv, --debug                # Show debug information
--O, --optimize              # Use optimized dstack
+-O, --optimize              # Use optimised dstack
 --version                   # Show version and exit
 
 # Examples
@@ -74,6 +76,33 @@ ual build -o myapp program.ual    # Creates myapp binary
 ual -q run program.ual            # Run quietly
 ual -v build program.ual          # Verbose build
 ```
+
+### Interpreter (iual)
+
+The interpreter runs UAL programs directly without compilation. Useful for development and testing.
+
+```bash
+# Commands
+iual program.ual            # Run program directly
+iual run program.ual        # Same as above
+iual version                # Show version
+iual help                   # Show help
+
+# Options
+-t, --trace                 # Trace execution
+-q, --quiet                 # Suppress non-essential output
+--verbose                   # Verbose output
+--debug                     # Debug mode (implies --trace)
+
+# Examples
+iual program.ual            # Run directly
+iual --trace program.ual    # Trace execution
+iual -q program.ual         # Quiet mode
+```
+
+**Performance Note:** The interpreter is approximately 10-50x slower than compiled code. For production workloads, use `ual build`.
+
+**Concurrency:** The interpreter uses real goroutines for `@spawn pop play`, matching the compiler's semantics. Both tools share the same runtime types from `pkg/runtime/`.
 
 ## Quick Start
 
@@ -760,8 +789,9 @@ BRING
 - `CHANGELOG.md` — Version history and feature details
 - `COMPUTE_SPEC_V2.md` — Compute block specification
 - `DESIGN_v0.8.md` — Design document for v0.8 features
-- `benchmarks/RESULTS.md` — Performance analysis
-- `examples/` — Working code examples (71 programs)
+- `ERROR_PHILOSOPHY.md` — Error handling philosophy
+- `BENCHMARK_SPECIFICATION.md` — Benchmark suite specification
+- `../examples/` — Working code examples (71 programs)
 
 ---
 

@@ -1,4 +1,4 @@
-package ual
+package runtime
 
 // WalkFunc is applied to each element during walk
 type WalkFunc func(data []byte) ([]byte, error)

@@ -1,4 +1,5 @@
-package main
+// Package lexer provides tokenisation for ual source code.
+package lexer
 
 import (
 	"fmt"
@@ -6,7 +7,7 @@ import (
 	"unicode"
 )
 
-// Token types
+// TokenType represents the type of a token.
 type TokenType int
 
 const (
@@ -171,7 +172,8 @@ const (
 	TokError
 )
 
-var tokenNames = map[TokenType]string{
+// TokenNames maps token types to their string representation.
+var TokenNames = map[TokenType]string{
 	TokIdent:       "IDENT",
 	TokStackRef:    "STACKREF",
 	TokInt:         "INT",
@@ -239,7 +241,8 @@ var tokenNames = map[TokenType]string{
 	TokError:       "ERROR",
 }
 
-var keywords = map[string]TokenType{
+// Keywords maps keyword strings to their token types.
+var Keywords = map[string]TokenType{
 	"stack":       TokStack,
 	"view":        TokView,
 	"new":         TokNew,
@@ -356,15 +359,17 @@ var keywords = map[string]TokenType{
 	"bytes":       TokBytes,
 }
 
+// Token represents a lexical token.
 type Token struct {
-	Type    TokenType
-	Value   string
-	Line    int
-	Column  int
+	Type   TokenType
+	Value  string
+	Line   int
+	Column int
 }
 
+// String returns a string representation of the token.
 func (t Token) String() string {
-	if name, ok := tokenNames[t.Type]; ok {
+	if name, ok := TokenNames[t.Type]; ok {
 		if t.Value != "" && t.Value != name {
 			return fmt.Sprintf("%s(%s)", name, t.Value)
 		}
@@ -373,6 +378,7 @@ func (t Token) String() string {
 	return fmt.Sprintf("TOKEN(%d)", t.Type)
 }
 
+// Lexer tokenises ual source code.
 type Lexer struct {
 	input  string
 	pos    int
@@ -380,6 +386,7 @@ type Lexer struct {
 	column int
 }
 
+// NewLexer creates a new Lexer for the given input.
 func NewLexer(input string) *Lexer {
 	return &Lexer{
 		input:  input,
@@ -532,7 +539,7 @@ func (l *Lexer) readIdent() Token {
 	}
 	
 	value := sb.String()
-	if tokType, ok := keywords[value]; ok {
+	if tokType, ok := Keywords[value]; ok {
 		return Token{tokType, value, startLine, startCol}
 	}
 	return Token{TokIdent, value, startLine, startCol}
@@ -556,6 +563,7 @@ func (l *Lexer) readStackRef() Token {
 	return Token{TokStackRef, sb.String(), startLine, startCol}
 }
 
+// NextToken returns the next token from the input.
 func (l *Lexer) NextToken() Token {
 	l.skipWhitespace()
 	
@@ -678,6 +686,7 @@ func (l *Lexer) NextToken() Token {
 	return Token{TokError, string(ch), startLine, startCol}
 }
 
+// Tokenize returns all tokens from the input.
 func (l *Lexer) Tokenize() []Token {
 	var tokens []Token
 	for {

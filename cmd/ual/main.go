@@ -8,6 +8,9 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/ha1tch/ual/pkg/ast"
+	"github.com/ha1tch/ual/pkg/lexer"
+	"github.com/ha1tch/ual/pkg/parser"
 	"github.com/ha1tch/ual/pkg/version"
 )
 
@@ -178,19 +181,19 @@ func generateGo(path string) (string, error) {
 	}
 	
 	// Lex
-	lexer := NewLexer(source)
-	tokens := lexer.Tokenize()
+	lex := lexer.NewLexer(source)
+	tokens := lex.Tokenize()
 	
 	// Check for lex errors
 	for _, tok := range tokens {
-		if tok.Type == TokError {
+		if tok.Type == lexer.TokError {
 			return "", fmt.Errorf("lexer error at line %d: %s", tok.Line, tok.Value)
 		}
 	}
 	
 	// Parse
-	parser := NewParser(tokens)
-	prog, err := parser.Parse()
+	prs := parser.NewParser(tokens)
+	prog, err := prs.Parse()
 	if err != nil {
 		return "", fmt.Errorf("parse error: %v", err)
 	}
@@ -441,20 +444,20 @@ func findUalRuntime() string {
 	if err == nil {
 		exeDir := filepath.Dir(exe)
 		
-		// Check if we're in the ual project directory
-		if _, err := os.Stat(filepath.Join(exeDir, "stack.go")); err == nil {
+		// Check if we're in the ual project directory (look for pkg/runtime/stack.go)
+		if _, err := os.Stat(filepath.Join(exeDir, "pkg", "runtime", "stack.go")); err == nil {
 			return exeDir
 		}
 		
 		// Check parent directory (if exe is in cmd/ual/)
 		parent := filepath.Dir(exeDir)
-		if _, err := os.Stat(filepath.Join(parent, "stack.go")); err == nil {
+		if _, err := os.Stat(filepath.Join(parent, "pkg", "runtime", "stack.go")); err == nil {
 			return parent
 		}
 		
 		// Check two levels up
 		grandparent := filepath.Dir(parent)
-		if _, err := os.Stat(filepath.Join(grandparent, "stack.go")); err == nil {
+		if _, err := os.Stat(filepath.Join(grandparent, "pkg", "runtime", "stack.go")); err == nil {
 			return grandparent
 		}
 	}
@@ -462,7 +465,7 @@ func findUalRuntime() string {
 	// Check current working directory
 	cwd, err := os.Getwd()
 	if err == nil {
-		if _, err := os.Stat(filepath.Join(cwd, "stack.go")); err == nil {
+		if _, err := os.Stat(filepath.Join(cwd, "pkg", "runtime", "stack.go")); err == nil {
 			return cwd
 		}
 	}
@@ -473,7 +476,7 @@ func findUalRuntime() string {
 		gopath = filepath.Join(os.Getenv("HOME"), "go")
 	}
 	ualPkg := filepath.Join(gopath, "src", "github.com", "ha1tch", "ual")
-	if _, err := os.Stat(filepath.Join(ualPkg, "stack.go")); err == nil {
+	if _, err := os.Stat(filepath.Join(ualPkg, "pkg", "runtime", "stack.go")); err == nil {
 		return ualPkg
 	}
 	
@@ -489,8 +492,8 @@ func showTokens(path string) {
 		os.Exit(1)
 	}
 	
-	lexer := NewLexer(source)
-	tokens := lexer.Tokenize()
+	lex := lexer.NewLexer(source)
+	tokens := lex.Tokenize()
 	
 	for _, tok := range tokens {
 		fmt.Printf("%3d:%-3d  %s\n", tok.Line, tok.Column, tok)
@@ -504,11 +507,11 @@ func showAST(path string) {
 		os.Exit(1)
 	}
 	
-	lexer := NewLexer(source)
-	tokens := lexer.Tokenize()
+	lex := lexer.NewLexer(source)
+	tokens := lex.Tokenize()
 	
-	parser := NewParser(tokens)
-	prog, err := parser.Parse()
+	prs := parser.NewParser(tokens)
+	prog, err := prs.Parse()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "parse error: %v\n", err)
 		os.Exit(1)
@@ -517,87 +520,90 @@ func showAST(path string) {
 	printAST(prog, 0)
 }
 
-func printAST(node Node, indent int) {
+func printAST(node interface{}, indent int) {
 	prefix := strings.Repeat("  ", indent)
 	
 	switch n := node.(type) {
-	case *Program:
+	case *ast.Program:
 		fmt.Printf("%sProgram\n", prefix)
 		for _, stmt := range n.Stmts {
 			printAST(stmt, indent+1)
 		}
 		
-	case *StackDecl:
+	case *ast.StackDecl:
 		fmt.Printf("%sStackDecl: @%s : %s (%s, cap=%d)\n", 
 			prefix, n.Name, n.ElementType, n.Perspective, n.Capacity)
 		
-	case *ViewDecl:
+	case *ast.ViewDecl:
 		fmt.Printf("%sViewDecl: %s : %s\n", prefix, n.Name, n.Perspective)
 		
-	case *Assignment:
+	case *ast.Assignment:
 		fmt.Printf("%sAssignment: %s =\n", prefix, n.Name)
 		printAST(n.Expr, indent+1)
 		
-	case *StackOp:
+	case *ast.StackOp:
 		fmt.Printf("%sStackOp: @%s.%s\n", prefix, n.Stack, n.Op)
 		for _, arg := range n.Args {
 			printAST(arg, indent+1)
 		}
 		
-	case *StackBlock:
+	case *ast.StackBlock:
 		fmt.Printf("%sStackBlock: @%s\n", prefix, n.Stack)
 		for _, op := range n.Ops {
 			printAST(op, indent+1)
 		}
 		
-	case *ViewOp:
+	case *ast.ViewOp:
 		fmt.Printf("%sViewOp: %s.%s\n", prefix, n.View, n.Op)
 		for _, arg := range n.Args {
 			printAST(arg, indent+1)
 		}
 		
-	case *IntLit:
+	case *ast.IntLit:
 		fmt.Printf("%sIntLit: %d\n", prefix, n.Value)
 		
-	case *FloatLit:
+	case *ast.FloatLit:
 		fmt.Printf("%sFloatLit: %f\n", prefix, n.Value)
 		
-	case *StringLit:
+	case *ast.StringLit:
 		fmt.Printf("%sStringLit: %q\n", prefix, n.Value)
 		
-	case *StackRef:
+	case *ast.StackRef:
 		fmt.Printf("%sStackRef: @%s\n", prefix, n.Name)
 		
-	case *Ident:
+	case *ast.Ident:
 		fmt.Printf("%sIdent: %s\n", prefix, n.Name)
 		
-	case *PerspectiveLit:
+	case *ast.PerspectiveLit:
 		fmt.Printf("%sPerspective: %s\n", prefix, n.Value)
 		
-	case *TypeLit:
+	case *ast.TypeLit:
 		fmt.Printf("%sType: %s\n", prefix, n.Value)
 		
-	case *BinaryOp:
+	case *ast.BinaryOp:
 		fmt.Printf("%sBinaryOp: %s\n", prefix, n.Op)
 		printAST(n.Left, indent+1)
 		printAST(n.Right, indent+1)
 		
-	case *StackExpr:
+	case *ast.StackExpr:
 		fmt.Printf("%sStackExpr: @%s.%s\n", prefix, n.Stack, n.Op)
 		for _, arg := range n.Args {
 			printAST(arg, indent+1)
 		}
 		
-	case *ViewExpr:
+	case *ast.ViewExpr:
 		fmt.Printf("%sViewExpr: %s.%s\n", prefix, n.View, n.Op)
 		for _, arg := range n.Args {
 			printAST(arg, indent+1)
 		}
 		
-	case *FnLit:
+	case *ast.FnLit:
 		fmt.Printf("%sFnLit: (%s)\n", prefix, strings.Join(n.Params, ", "))
 		for _, stmt := range n.Body {
 			printAST(stmt, indent+1)
 		}
+		
+	default:
+		fmt.Printf("%s<%T>\n", prefix, node)
 	}
 }

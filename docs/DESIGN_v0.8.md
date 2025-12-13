@@ -1,6 +1,6 @@
 # UAL Design Decisions — Implementation Specification v0.8
 
-**Document Purpose:** This specification captures design decisions made for UAL v0.8, intended for implementors continuing development. It assumes familiarity with UAL v0.7.2 architecture (lexer, parser, codegen in `cmd/ual/`, runtime in `stack.go`, `view.go`, etc.).
+**Document Purpose:** This specification captures design decisions made for UAL v0.8, intended for implementors continuing development. It assumes familiarity with UAL v0.7.3 architecture (lexer, parser, codegen in `cmd/ual/`, interpreter in `cmd/iual/`, runtime in `pkg/runtime/`).
 
 **Context:** These decisions emerged from analysis of UAL's concurrency model and its relationship to distributed systems patterns. The core insight is that UAL's stack-based primitives generalise naturally to I/O and network operations, and that the existing constructs (`select`, `consider`, `compute`) form a coherent system for handling time, outcomes, and interpretation.
 
@@ -766,11 +766,15 @@ file.sink("output.txt", @output)
 
 ## 10. References
 
-- UAL v0.7.2 source: `cmd/ual/` (lexer, parser, codegen, main)
-- Runtime: `stack.go`, `view.go`, `bring.go`, `walk.go`, `worksteal.go`
+- UAL v0.7.3 compiler: `../cmd/ual/` (lexer, parser, codegen, main)
+- UAL v0.7.3 interpreter: `../cmd/iual/` (interp, interp_control, interp_expr)
+- Shared packages: `../pkg/ast/`, `../pkg/lexer/`, `../pkg/parser/`, `../pkg/runtime/`, `../pkg/version/`
+- Runtime: `../pkg/runtime/` (Stack, Value, ValueStack, ScopeStack, View, Bring, Walk)
 - Existing constructs: `MANUAL.md`, `COMPUTE_SPEC_V2.md`
-- Examples: `examples/` directory (60+ programs)
-- Benchmarks: `benchmarks/` directory
+- Examples: `../examples/` directory (71 programs)
+- Benchmarks: `../benchmarks/` directory
+
+**Implementation Note (v0.7.3):** As of v0.7.3, the interpreter has achieved parity with the compiler. Both use `pkg/runtime` types and execute spawned tasks as goroutines. All 71 example tests pass in both tools. This provides a foundation for implementing v0.8 features in both tools simultaneously.
 
 ---
 

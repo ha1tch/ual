@@ -1,571 +1,65 @@
-package main
+// Package parser provides parsing for ual source code.
+package parser
 
 import (
 	"fmt"
 	"strconv"
+
+	"github.com/ha1tch/ual/pkg/ast"
+	"github.com/ha1tch/ual/pkg/lexer"
 )
-
-// AST Node types
-
-type Node interface {
-	node()
-}
-
-type Stmt interface {
-	Node
-	stmt()
-}
-
-type Expr interface {
-	Node
-	expr()
-}
-
-// Statements
-
-type Program struct {
-	Stmts []Stmt
-}
-
-func (p *Program) node() {}
-
-// StackDecl: @name = stack.new(type, cap: n)
-type StackDecl struct {
-	Name        string
-	ElementType string
-	Perspective string // optional, defaults to LIFO
-	Capacity    int    // 0 = unlimited
-}
-
-func (s *StackDecl) node() {}
-func (s *StackDecl) stmt() {}
-
-// ViewDecl: name = view.new(perspective)
-type ViewDecl struct {
-	Name        string
-	Perspective string
-}
-
-func (v *ViewDecl) node() {}
-func (v *ViewDecl) stmt() {}
-
-// Assignment: name = expr
-type Assignment struct {
-	Name string
-	Expr Expr
-}
-
-func (a *Assignment) node() {}
-func (a *Assignment) stmt() {}
-
-// StackOp: @stack: operation(args...)
-type StackOp struct {
-	Stack  string
-	Op     string
-	Args   []Expr
-	Target string // for pop:var, take:var — direct assignment to variable
-}
-
-func (s *StackOp) node() {}
-func (s *StackOp) stmt() {}
-
-// StackBlock: @stack { op op op }
-type StackBlock struct {
-	Stack string
-	Ops   []Stmt
-}
-
-func (s *StackBlock) node() {}
-func (s *StackBlock) stmt() {}
-
-// VarDecl: var name type = value
-// or: var name, name2 type = value, value2
-type VarDecl struct {
-	Names  []string
-	Type   string   // explicit type, or "" for inference
-	Values []Expr   // initial values (may be empty for zero-init)
-}
-
-func (v *VarDecl) node() {}
-func (v *VarDecl) stmt() {}
-
-// ArrayDecl: var buf[1024] (local fixed-size array in compute blocks)
-type ArrayDecl struct {
-	Name string
-	Size int64  // array size (must be constant)
-}
-
-func (a *ArrayDecl) node() {}
-func (a *ArrayDecl) stmt() {}
-
-// IndexedAssignStmt: buf[i] = expr (indexed assignment in compute blocks)
-type IndexedAssignStmt struct {
-	Target string // array name or "self"
-	Member string // for self.prop[i], the property name; empty for buf[i]
-	Index  Expr   // index expression
-	Value  Expr   // value to assign
-}
-
-func (i *IndexedAssignStmt) node() {}
-func (i *IndexedAssignStmt) stmt() {}
-
-// LetAssign: let:name (dynamic assignment from stack top)
-type LetAssign struct {
-	Name  string
-	Stack string // source stack (usually @dstack)
-}
-
-func (l *LetAssign) node() {}
-func (l *LetAssign) stmt() {}
-
-// AssignStmt: name = expr (reassignment)
-type AssignStmt struct {
-	Name  string
-	Value Expr
-}
-
-func (a *AssignStmt) node() {}
-func (a *AssignStmt) stmt() {}
-
-// ExprStmt wraps an expression as a statement
-// Used in codeblocks for implicit return value
-type ExprStmt struct {
-	Expr Expr
-}
-
-func (e *ExprStmt) node() {}
-func (e *ExprStmt) stmt() {}
-
-// IfStmt: if (condition) { body } elseif (cond) { body } else { body }
-type IfStmt struct {
-	Condition Expr      // condition expression
-	Body      []Stmt    // if body
-	ElseIfs   []ElseIf  // elseif branches
-	Else      []Stmt    // else body (may be empty)
-}
-
-type ElseIf struct {
-	Condition Expr
-	Body      []Stmt
-}
-
-func (i *IfStmt) node() {}
-func (i *IfStmt) stmt() {}
-
-// WhileStmt: while (condition) { body }
-type WhileStmt struct {
-	Condition Expr
-	Body      []Stmt
-}
-
-func (w *WhileStmt) node() {}
-func (w *WhileStmt) stmt() {}
-
-// BreakStmt: break
-type BreakStmt struct{}
-
-func (b *BreakStmt) node() {}
-func (b *BreakStmt) stmt() {}
-
-// ContinueStmt: continue
-type ContinueStmt struct{}
-
-func (c *ContinueStmt) node() {}
-func (c *ContinueStmt) stmt() {}
-
-// ForStmt: @stack for{ body } or @stack for{|v| body } or @stack.perspective for{|i,v| body }
-type ForStmt struct {
-	Stack       string   // stack to iterate
-	Perspective string   // lifo, fifo, indexed, hash (empty = default)
-	Params      []string // variable names: [], [v], [i,v], [k,v]
-	Body        []Stmt
-}
-
-func (f *ForStmt) node() {}
-func (f *ForStmt) stmt() {}
-
-// FuncDecl: func name(params) returnType { body }
-// or: @error < func name(params) returnType { body }  -- can fail
-type FuncDecl struct {
-	Name       string
-	Params     []FuncParam
-	ReturnType string   // "" for void
-	CanFail    bool     // true if @error < prefix
-	Body       []Stmt
-}
-
-type FuncParam struct {
-	Name string
-	Type string
-}
-
-func (f *FuncDecl) node() {}
-func (f *FuncDecl) stmt() {}
-
-// FuncCall: name(args) or name:arg
-type FuncCall struct {
-	Name string
-	Args []Expr
-}
-
-func (f *FuncCall) node() {}
-func (f *FuncCall) stmt() {}
-func (f *FuncCall) expr() {}
-
-// ReturnStmt: return or return expr or return expr, expr, ...
-type ReturnStmt struct {
-	Value  Expr   // single return value (nil for void return)
-	Values []Expr // multiple return values (for compute blocks)
-}
-
-func (r *ReturnStmt) node() {}
-func (r *ReturnStmt) stmt() {}
-
-// DeferStmt: @defer < { body }
-type DeferStmt struct {
-	Body []Stmt // deferred statements (code block pushed to defer stack)
-}
-
-func (d *DeferStmt) node() {}
-func (d *DeferStmt) stmt() {}
-
-// PanicStmt: panic or panic:msg or panic:expr
-type PanicStmt struct {
-	Value Expr // nil for bare panic (re-panic in recover)
-}
-
-func (p *PanicStmt) node() {}
-func (p *PanicStmt) stmt() {}
-
-// TryStmt: try { body } catch { handler } or try { body } catch |err| { handler }
-type TryStmt struct {
-	Body      []Stmt // try body
-	ErrName   string // variable name for caught error (empty = no binding)
-	Catch     []Stmt // catch body (runs if panic)
-	Finally   []Stmt // finally body (always runs, like defer)
-}
-
-func (t *TryStmt) node() {}
-func (t *TryStmt) stmt() {}
-
-// ConsiderCase: one case in a consider block, e.g. ok: handler() or error |e|: handle(e)
-type ConsiderCase struct {
-	Label    string   // "ok", "error", "notfound", "_" (default), or integer string
-	Bindings []string // optional value bindings: |val| or |code, msg|
-	Handler  []Stmt   // handler statements (code block or single call)
-}
-
-// ConsiderStmt: block.consider( case: handler, ... )
-// Matches on the outcome status of the preceding block
-type ConsiderStmt struct {
-	Block *StackBlock   // the block being considered (nil if bare block)
-	Cases []ConsiderCase // cases to match
-}
-
-func (c *ConsiderStmt) node() {}
-func (c *ConsiderStmt) stmt() {}
-
-// StatusStmt: status:label or status:label(value)
-// Sets the status for the enclosing consider block
-type StatusStmt struct {
-	Label string // "ok", "error", "cancel", etc.
-	Value Expr   // optional value to pass to handler
-}
-
-func (s *StatusStmt) node() {}
-func (s *StatusStmt) stmt() {}
-
-// SelectCase: one case in a select block
-// e.g. @inbox {|msg| handle(msg)} or @inbox {|msg| handle(msg) timeout(100, {|| retry()})}
-type SelectCase struct {
-	Stack      string   // stack to wait on ("" uses default from parent, "_" for default case)
-	Bindings   []string // variable names for received value: |msg| or |k,v|
-	Handler    []Stmt   // handler statements
-	TimeoutMs  Expr     // optional timeout in milliseconds (nil = no timeout)
-	TimeoutFn  *FnLit   // optional timeout handler closure
-}
-
-// SelectStmt: block.select( case, case, ... )
-// Waits on multiple stacks, first to yield data wins
-type SelectStmt struct {
-	Block        *StackBlock  // setup block (also provides default stack)
-	DefaultStack string       // stack name from setup block (for implicit cases)
-	Cases        []SelectCase // cases to match
-}
-
-func (s *SelectStmt) node() {}
-func (s *SelectStmt) stmt() {}
-
-// ComputeStmt: @stack { setup }.compute({|a, b| ... return x })
-type ComputeStmt struct {
-	StackName string      // the stack this is attached to
-	Setup     *StackBlock // the preceding setup block
-	Params    []string    // binding names (|a, b|)
-	Body      []Stmt      // infix math statements
-}
-
-func (c *ComputeStmt) node() {}
-func (c *ComputeStmt) stmt() {}
-
-// MemberExpr: self.mass (for accessing container state in compute blocks)
-type MemberExpr struct {
-	Target string // "self"
-	Member string // "mass"
-}
-
-func (m *MemberExpr) node() {}
-func (m *MemberExpr) expr() {}
-
-// IndexExpr: arr[i] or self[i] (for indexed access in compute blocks)
-type IndexExpr struct {
-	Target string // variable name ("buf") or "self"
-	Index  Expr   // index expression
-}
-
-func (i *IndexExpr) node() {}
-func (i *IndexExpr) expr() {}
-
-// MemberIndexExpr: self.prop[i] (for array-like access to container properties)
-type MemberIndexExpr struct {
-	Target string // "self"
-	Member string // property name ("pixels", "weights", etc.)
-	Index  Expr   // index expression
-}
-
-func (m *MemberIndexExpr) node() {}
-func (m *MemberIndexExpr) expr() {}
-
-// ErrorPush: @error < expr (push error to error stack)
-type ErrorPush struct {
-	Code    string // error code like "DIV_ZERO"
-	Message Expr   // error message (string or expr)
-}
-
-func (e *ErrorPush) node() {}
-func (e *ErrorPush) stmt() {}
-
-// SpawnPush: @spawn < { block } — push codeblock to spawn queue
-type SpawnPush struct {
-	Params []string // parameter names for codeblock
-	Body   []Stmt   // codeblock body
-}
-
-func (s *SpawnPush) node() {}
-func (s *SpawnPush) stmt() {}
-
-// SpawnOp: @spawn peek play, @spawn pop play, etc.
-type SpawnOp struct {
-	Op   string // "peek", "pop", "len", "clear"
-	Play bool   // if true, execute the codeblock
-	Args []Expr // arguments for play()
-}
-
-func (s *SpawnOp) node() {}
-func (s *SpawnOp) stmt() {}
-
-// Block: generic statement block
-type Block struct {
-	Stmts []Stmt
-}
-
-func (b *Block) node() {}
-func (b *Block) stmt() {}
-
-// BinaryExpr: a op b (for conditions)
-type BinaryExpr struct {
-	Left  Expr
-	Op    string // ">", "<", "==", "!=", ">=", "<="
-	Right Expr
-}
-
-func (b *BinaryExpr) node() {}
-func (b *BinaryExpr) expr() {}
-
-// ViewOp: view: operation(args...)
-type ViewOp struct {
-	View string
-	Op   string
-	Args []Expr
-}
-
-func (v *ViewOp) node() {}
-func (v *ViewOp) stmt() {}
-
-// Expressions
-
-// IntLit: 42
-type IntLit struct {
-	Value int64
-}
-
-func (i *IntLit) node() {}
-func (i *IntLit) expr() {}
-
-// FloatLit: 3.14
-type FloatLit struct {
-	Value float64
-}
-
-func (f *FloatLit) node() {}
-func (f *FloatLit) expr() {}
-
-// StringLit: "hello"
-type StringLit struct {
-	Value string
-}
-
-func (s *StringLit) node() {}
-func (s *StringLit) expr() {}
-
-// StackRef: @name
-type StackRef struct {
-	Name string
-}
-
-func (s *StackRef) node() {}
-func (s *StackRef) expr() {}
-
-// Ident: name
-type Ident struct {
-	Name string
-}
-
-func (i *Ident) node() {}
-func (i *Ident) expr() {}
-
-// BoolLit: true, false
-type BoolLit struct {
-	Value bool
-}
-
-func (b *BoolLit) node() {}
-func (b *BoolLit) expr() {}
-
-// UnaryExpr: -x, !x
-type UnaryExpr struct {
-	Op      string // "-", "!"
-	Operand Expr
-}
-
-func (u *UnaryExpr) node() {}
-func (u *UnaryExpr) expr() {}
-
-// CallExpr: fn(args)
-type CallExpr struct {
-	Fn   string
-	Args []Expr
-}
-
-func (c *CallExpr) node() {}
-func (c *CallExpr) expr() {}
-
-// Perspective: LIFO, FIFO, Indexed, Hash
-type PerspectiveLit struct {
-	Value string
-}
-
-func (p *PerspectiveLit) node() {}
-func (p *PerspectiveLit) expr() {}
-
-// TypeLit: i64, f64, string, etc.
-type TypeLit struct {
-	Value string
-}
-
-func (t *TypeLit) node() {}
-func (t *TypeLit) expr() {}
-
-// BinaryOp: a + b, a * b, etc.
-type BinaryOp struct {
-	Left  Expr
-	Op    string
-	Right Expr
-}
-
-func (b *BinaryOp) node() {}
-func (b *BinaryOp) expr() {}
-
-// StackExpr: @stack: pop(), @stack: peek()
-type StackExpr struct {
-	Stack string
-	Op    string
-	Args  []Expr
-}
-
-func (s *StackExpr) node() {}
-func (s *StackExpr) expr() {}
-
-// ViewExpr: view: pop(), view: peek()
-type ViewExpr struct {
-	View string
-	Op   string
-	Args []Expr
-}
-
-func (v *ViewExpr) node() {}
-func (v *ViewExpr) expr() {}
-
-// FnLit: anonymous function (codeblock)
-// Syntax: { body } or {|params| body }
-type FnLit struct {
-	Params []string
-	Body   []Stmt  // statements, result is stack top after execution
-}
-
-func (f *FnLit) node() {}
-func (f *FnLit) expr() {}
 
 // Parser
 
 type Parser struct {
-	tokens []Token
+	tokens []lexer.Token
 	pos    int
 }
 
-func NewParser(tokens []Token) *Parser {
+func NewParser(tokens []lexer.Token) *Parser {
 	return &Parser{tokens: tokens, pos: 0}
 }
 
-func (p *Parser) peek() Token {
+func (p *Parser) peek() lexer.Token {
 	if p.pos >= len(p.tokens) {
-		return Token{TokEOF, "", 0, 0}
+		return lexer.Token{lexer.TokEOF, "", 0, 0}
 	}
 	return p.tokens[p.pos]
 }
 
-func (p *Parser) peekAhead(n int) Token {
+func (p *Parser) peekAhead(n int) lexer.Token {
 	if p.pos+n >= len(p.tokens) {
-		return Token{TokEOF, "", 0, 0}
+		return lexer.Token{lexer.TokEOF, "", 0, 0}
 	}
 	return p.tokens[p.pos+n]
 }
 
-func (p *Parser) advance() Token {
+func (p *Parser) advance() lexer.Token {
 	tok := p.peek()
 	p.pos++
 	return tok
 }
 
-func (p *Parser) expect(t TokenType) (Token, error) {
+func (p *Parser) expect(t lexer.TokenType) (lexer.Token, error) {
 	tok := p.peek()
 	if tok.Type != t {
-		return tok, fmt.Errorf("line %d: expected %v, got %v", tok.Line, tokenNames[t], tok)
+		return tok, fmt.Errorf("line %d: expected %v, got %v", tok.Line, lexer.TokenNames[t], tok)
 	}
 	return p.advance(), nil
 }
 
 func (p *Parser) skipNewlines() {
-	for p.peek().Type == TokNewline {
+	for p.peek().Type == lexer.TokNewline {
 		p.advance()
 	}
 }
 
-func (p *Parser) Parse() (*Program, error) {
-	prog := &Program{}
+func (p *Parser) Parse() (*ast.Program, error) {
+	prog := &ast.Program{}
 	
 	p.skipNewlines()
 	
-	for p.peek().Type != TokEOF {
+	for p.peek().Type != lexer.TokEOF {
 		stmt, err := p.parseStmt()
 		if err != nil {
 			return nil, err
@@ -579,61 +73,61 @@ func (p *Parser) Parse() (*Program, error) {
 	return prog, nil
 }
 
-func (p *Parser) parseStmt() (Stmt, error) {
+func (p *Parser) parseStmt() (ast.Stmt, error) {
 	tok := p.peek()
 	
 	switch tok.Type {
-	case TokStackRef:
+	case lexer.TokStackRef:
 		return p.parseStackStmt()
-	case TokIdent:
+	case lexer.TokIdent:
 		return p.parseIdentStmt()
-	case TokVar:
+	case lexer.TokVar:
 		return p.parseVarDecl()
-	case TokLet:
+	case lexer.TokLet:
 		return p.parseLetAssign("dstack")
-	case TokIf:
+	case lexer.TokIf:
 		return p.parseIfStmt()
-	case TokWhile:
+	case lexer.TokWhile:
 		return p.parseWhileStmt()
-	case TokBreak:
+	case lexer.TokBreak:
 		p.advance()
-		return &BreakStmt{}, nil
-	case TokContinue:
+		return &ast.BreakStmt{}, nil
+	case lexer.TokContinue:
 		p.advance()
-		return &ContinueStmt{}, nil
-	case TokFunc:
+		return &ast.ContinueStmt{}, nil
+	case lexer.TokFunc:
 		return p.parseFuncDecl(false)
-	case TokReturn:
+	case lexer.TokReturn:
 		return p.parseReturnStmt()
-	case TokPanic:
+	case lexer.TokPanic:
 		return p.parsePanicStmt()
-	case TokTry:
+	case lexer.TokTry:
 		return p.parseTryStmt()
-	case TokStatus:
+	case lexer.TokStatus:
 		return p.parseStatusStmt()
-	case TokRetry:
+	case lexer.TokRetry:
 		p.advance() // consume 'retry'
 		// Optional parentheses
-		if p.peek().Type == TokLParen {
+		if p.peek().Type == lexer.TokLParen {
 			p.advance() // consume (
-			if p.peek().Type != TokRParen {
+			if p.peek().Type != lexer.TokRParen {
 				return nil, fmt.Errorf("line %d: retry() takes no arguments", tok.Line)
 			}
 			p.advance() // consume )
 		}
-		return &FuncCall{Name: "retry", Args: nil}, nil
-	case TokRestart:
+		return &ast.FuncCall{Name: "retry", Args: nil}, nil
+	case lexer.TokRestart:
 		p.advance() // consume 'restart'
 		// Optional parentheses
-		if p.peek().Type == TokLParen {
+		if p.peek().Type == lexer.TokLParen {
 			p.advance() // consume (
-			if p.peek().Type != TokRParen {
+			if p.peek().Type != lexer.TokRParen {
 				return nil, fmt.Errorf("line %d: restart() takes no arguments", tok.Line)
 			}
 			p.advance() // consume )
 		}
-		return &FuncCall{Name: "restart", Args: nil}, nil
-	case TokNewline:
+		return &ast.FuncCall{Name: "restart", Args: nil}, nil
+	case lexer.TokNewline:
 		p.advance()
 		return nil, nil
 	default:
@@ -646,8 +140,8 @@ func (p *Parser) parseStmt() (Stmt, error) {
 }
 
 // Parse operations without explicit stack reference - use @dstack
-func (p *Parser) parseImplicitStackOps() (Stmt, error) {
-	var ops []Stmt
+func (p *Parser) parseImplicitStackOps() (ast.Stmt, error) {
+	var ops []ast.Stmt
 	
 	for {
 		op, err := p.parseOperation("dstack", false)
@@ -659,7 +153,7 @@ func (p *Parser) parseImplicitStackOps() (Stmt, error) {
 		}
 		
 		next := p.peek()
-		if next.Type == TokNewline || next.Type == TokEOF || next.Type == TokRBrace {
+		if next.Type == lexer.TokNewline || next.Type == lexer.TokEOF || next.Type == lexer.TokRBrace {
 			break
 		}
 		if !isOperationToken(next.Type) {
@@ -671,29 +165,29 @@ func (p *Parser) parseImplicitStackOps() (Stmt, error) {
 		return ops[0], nil
 	}
 	
-	return &StackBlock{Stack: "dstack", Ops: ops}, nil
+	return &ast.StackBlock{Stack: "dstack", Ops: ops}, nil
 }
 
 // @stack: op(...) or @stack = stack.new(...) or @stack { block } or @stack op op op
-func (p *Parser) parseStackStmt() (Stmt, error) {
+func (p *Parser) parseStackStmt() (ast.Stmt, error) {
 	stackTok := p.advance() // @name
 	name := stackTok.Value
 	perspective := ""
 	
 	next := p.peek()
 	
-	if next.Type == TokEquals {
+	if next.Type == lexer.TokEquals {
 		// @stack = stack.new(...)
 		p.advance() // consume =
 		return p.parseStackDecl(name)
 	}
 	
 	// Check for @error < ... (function that can fail, or push error)
-	if name == "error" && next.Type == TokSymLt {
+	if name == "error" && next.Type == lexer.TokSymLt {
 		p.advance() // consume <
 		
 		// @error < func — function that can fail
-		if p.peek().Type == TokFunc {
+		if p.peek().Type == lexer.TokFunc {
 			return p.parseFuncDecl(true)
 		}
 		
@@ -702,22 +196,22 @@ func (p *Parser) parseStackStmt() (Stmt, error) {
 		if err != nil {
 			return nil, err
 		}
-		return &ErrorPush{Message: expr}, nil
+		return &ast.ErrorPush{Message: expr}, nil
 	}
 	
 	// Check for @defer < { block } — push code block to defer stack
-	if name == "defer" && next.Type == TokSymLt {
+	if name == "defer" && next.Type == lexer.TokSymLt {
 		p.advance() // consume <
 		
 		// Expect { block }
-		if p.peek().Type != TokLBrace {
+		if p.peek().Type != lexer.TokLBrace {
 			return nil, fmt.Errorf("line %d: expected '{' after '@defer <'", p.peek().Line)
 		}
 		p.advance() // consume '{'
 		p.skipNewlines()
 		
-		var body []Stmt
-		for p.peek().Type != TokRBrace && p.peek().Type != TokEOF {
+		var body []ast.Stmt
+		for p.peek().Type != lexer.TokRBrace && p.peek().Type != lexer.TokEOF {
 			stmt, err := p.parseStmt()
 			if err != nil {
 				return nil, err
@@ -728,19 +222,19 @@ func (p *Parser) parseStackStmt() (Stmt, error) {
 			p.skipNewlines()
 		}
 		
-		if _, err := p.expect(TokRBrace); err != nil {
+		if _, err := p.expect(lexer.TokRBrace); err != nil {
 			return nil, fmt.Errorf("line %d: expected '}' to close defer block", p.peek().Line)
 		}
 		
-		return &DeferStmt{Body: body}, nil
+		return &ast.DeferStmt{Body: body}, nil
 	}
 	
 	// Check for @spawn < { block } — push codeblock to spawn queue
-	if name == "spawn" && next.Type == TokSymLt {
+	if name == "spawn" && next.Type == lexer.TokSymLt {
 		p.advance() // consume <
 		
 		// Expect { block } or {|params| block }
-		if p.peek().Type != TokLBrace {
+		if p.peek().Type != lexer.TokLBrace {
 			return nil, fmt.Errorf("line %d: expected '{' after '@spawn <'", p.peek().Line)
 		}
 		p.advance() // consume '{'
@@ -748,28 +242,28 @@ func (p *Parser) parseStackStmt() (Stmt, error) {
 		var params []string
 		
 		// Check for |params|
-		if p.peek().Type == TokPipe {
+		if p.peek().Type == lexer.TokPipe {
 			p.advance() // consume opening |
-			if p.peek().Type == TokIdent {
+			if p.peek().Type == lexer.TokIdent {
 				params = append(params, p.advance().Value)
-				for p.peek().Type == TokComma {
+				for p.peek().Type == lexer.TokComma {
 					p.advance()
-					paramTok, err := p.expect(TokIdent)
+					paramTok, err := p.expect(lexer.TokIdent)
 					if err != nil {
 						return nil, err
 					}
 					params = append(params, paramTok.Value)
 				}
 			}
-			if _, err := p.expect(TokPipe); err != nil {
+			if _, err := p.expect(lexer.TokPipe); err != nil {
 				return nil, fmt.Errorf("line %d: expected '|' to close parameter list", p.peek().Line)
 			}
 		}
 		
 		p.skipNewlines()
 		
-		var body []Stmt
-		for p.peek().Type != TokRBrace && p.peek().Type != TokEOF {
+		var body []ast.Stmt
+		for p.peek().Type != lexer.TokRBrace && p.peek().Type != lexer.TokEOF {
 			stmt, err := p.parseStmt()
 			if err != nil {
 				return nil, err
@@ -780,11 +274,11 @@ func (p *Parser) parseStackStmt() (Stmt, error) {
 			p.skipNewlines()
 		}
 		
-		if _, err := p.expect(TokRBrace); err != nil {
+		if _, err := p.expect(lexer.TokRBrace); err != nil {
 			return nil, fmt.Errorf("line %d: expected '}' to close spawn block", p.peek().Line)
 		}
 		
-		return &SpawnPush{Params: params, Body: body}, nil
+		return &ast.SpawnPush{Params: params, Body: body}, nil
 	}
 	
 	// Check for @spawn operations: peek, pop, len, clear (with optional play)
@@ -793,9 +287,9 @@ func (p *Parser) parseStackStmt() (Stmt, error) {
 	}
 	
 	// Check for perspective modifier: @stack.lifo, @stack.fifo, etc.
-	if next.Type == TokDot {
+	if next.Type == lexer.TokDot {
 		p.advance() // consume .
-		perspTok, err := p.expect(TokIdent)
+		perspTok, err := p.expect(lexer.TokIdent)
 		if err != nil {
 			return nil, fmt.Errorf("line %d: expected perspective name after '.'", p.peek().Line)
 		}
@@ -804,28 +298,28 @@ func (p *Parser) parseStackStmt() (Stmt, error) {
 	}
 	
 	// Check for 'for' keyword
-	if next.Type == TokFor {
+	if next.Type == lexer.TokFor {
 		return p.parseForStmt(name, perspective)
 	}
 	
-	if next.Type == TokLBrace {
+	if next.Type == lexer.TokLBrace {
 		// @stack { block }
 		return p.parseStackBlock(name)
 	}
 	
 	// Generic @stack < expr — push to any stack
-	if next.Type == TokSymLt {
+	if next.Type == lexer.TokSymLt {
 		p.advance() // consume <
 		expr, err := p.parseExpr()
 		if err != nil {
 			return nil, err
 		}
 		// Generate a push operation
-		return &StackOp{Stack: name, Op: "push", Args: []Expr{expr}}, nil
+		return &ast.StackOp{Stack: name, Op: "push", Args: []ast.Expr{expr}}, nil
 	}
 	
 	// Optional colon before operations
-	if next.Type == TokColon {
+	if next.Type == lexer.TokColon {
 		p.advance() // consume :
 	}
 	
@@ -834,60 +328,60 @@ func (p *Parser) parseStackStmt() (Stmt, error) {
 }
 
 // Parse a block of operations: @stack { op op op }
-func (p *Parser) parseStackBlock(name string) (Stmt, error) {
+func (p *Parser) parseStackBlock(name string) (ast.Stmt, error) {
 	p.advance() // consume {
 	p.skipNewlines()
 	
-	var ops []Stmt
+	var ops []ast.Stmt
 	
-	for p.peek().Type != TokRBrace && p.peek().Type != TokEOF {
+	for p.peek().Type != lexer.TokRBrace && p.peek().Type != lexer.TokEOF {
 		tok := p.peek()
 		
 		// Handle statements that can appear inside a stack block
 		switch tok.Type {
-		case TokStatus:
+		case lexer.TokStatus:
 			// status:label statement
 			stmt, err := p.parseStatusStmt()
 			if err != nil {
 				return nil, err
 			}
 			ops = append(ops, stmt)
-		case TokIf:
+		case lexer.TokIf:
 			// if statement
 			stmt, err := p.parseIfStmt()
 			if err != nil {
 				return nil, err
 			}
 			ops = append(ops, stmt)
-		case TokWhile:
+		case lexer.TokWhile:
 			// while statement
 			stmt, err := p.parseWhileStmt()
 			if err != nil {
 				return nil, err
 			}
 			ops = append(ops, stmt)
-		case TokVar:
+		case lexer.TokVar:
 			// variable declaration
 			stmt, err := p.parseVarDecl()
 			if err != nil {
 				return nil, err
 			}
 			ops = append(ops, stmt)
-		case TokLet:
+		case lexer.TokLet:
 			// let assignment
 			stmt, err := p.parseLetAssign(name)
 			if err != nil {
 				return nil, err
 			}
 			ops = append(ops, stmt)
-		case TokReturn:
+		case lexer.TokReturn:
 			// return statement
 			stmt, err := p.parseReturnStmt()
 			if err != nil {
 				return nil, err
 			}
 			ops = append(ops, stmt)
-		case TokStackRef:
+		case lexer.TokStackRef:
 			// nested stack operation @stack...
 			stmt, err := p.parseStackStmt()
 			if err != nil {
@@ -902,35 +396,35 @@ func (p *Parser) parseStackBlock(name string) (Stmt, error) {
 			}
 			if op != nil {
 				ops = append(ops, op)
-			} else if tok.Type != TokNewline {
+			} else if tok.Type != lexer.TokNewline {
 				// Not an operation and not a newline - unexpected token
 				return nil, fmt.Errorf("line %d: unexpected token in block: %v", tok.Line, tok)
 			}
 		}
 		
 		// Skip newlines between statements
-		for p.peek().Type == TokNewline {
+		for p.peek().Type == lexer.TokNewline {
 			p.advance()
 		}
 	}
 	
-	_, err := p.expect(TokRBrace)
+	_, err := p.expect(lexer.TokRBrace)
 	if err != nil {
 		return nil, err
 	}
 	
-	block := &StackBlock{Stack: name, Ops: ops}
+	block := &ast.StackBlock{Stack: name, Ops: ops}
 	
 	// Check for .consider( or .select( or .compute( suffix
-	if p.peek().Type == TokDot {
+	if p.peek().Type == lexer.TokDot {
 		p.advance() // consume .
-		if p.peek().Type == TokConsider {
+		if p.peek().Type == lexer.TokConsider {
 			return p.parseConsider(block)
 		}
-		if p.peek().Type == TokSelect {
+		if p.peek().Type == lexer.TokSelect {
 			return p.parseSelect(block)
 		}
-		if p.peek().Type == TokCompute {
+		if p.peek().Type == lexer.TokCompute {
 			return p.parseCompute(block)
 		}
 		// Not consider, select, or compute, put the dot back conceptually by returning error
@@ -941,8 +435,8 @@ func (p *Parser) parseStackBlock(name string) (Stmt, error) {
 }
 
 // Parse one or more operations on a line: @stack op:arg op:arg
-func (p *Parser) parseStackOps(name string) (Stmt, error) {
-	var ops []Stmt
+func (p *Parser) parseStackOps(name string) (ast.Stmt, error) {
+	var ops []ast.Stmt
 	
 	for {
 		op, err := p.parseOperation(name, false)
@@ -955,7 +449,7 @@ func (p *Parser) parseStackOps(name string) (Stmt, error) {
 		
 		// Check for end of operations
 		next := p.peek()
-		if next.Type == TokNewline || next.Type == TokEOF || next.Type == TokRBrace {
+		if next.Type == lexer.TokNewline || next.Type == lexer.TokEOF || next.Type == lexer.TokRBrace {
 			break
 		}
 	}
@@ -964,15 +458,15 @@ func (p *Parser) parseStackOps(name string) (Stmt, error) {
 		return ops[0], nil
 	}
 	
-	return &StackBlock{Stack: name, Ops: ops}, nil
+	return &ast.StackBlock{Stack: name, Ops: ops}, nil
 }
 
 // Parse a single operation: op(args) or op:arg or op
-func (p *Parser) parseOperation(stackName string, inBlock bool) (*StackOp, error) {
+func (p *Parser) parseOperation(stackName string, inBlock bool) (*ast.StackOp, error) {
 	tok := p.peek()
 	
 	// Skip newlines in blocks
-	if tok.Type == TokNewline {
+	if tok.Type == lexer.TokNewline {
 		if inBlock {
 			p.advance()
 			return nil, nil
@@ -987,23 +481,23 @@ func (p *Parser) parseOperation(stackName string, inBlock bool) (*StackOp, error
 	opTok := p.advance()
 	op := opTok.Value
 	
-	var args []Expr
+	var args []ast.Expr
 	var target string
 	
 	next := p.peek()
 	
-	if next.Type == TokLParen {
+	if next.Type == lexer.TokLParen {
 		// op(args) - parenthesized form
 		p.advance() // consume (
 		
-		if p.peek().Type != TokRParen {
+		if p.peek().Type != lexer.TokRParen {
 			arg, err := p.parseExpr()
 			if err != nil {
 				return nil, err
 			}
 			args = append(args, arg)
 			
-			for p.peek().Type == TokComma {
+			for p.peek().Type == lexer.TokComma {
 				p.advance()
 				arg, err := p.parseExpr()
 				if err != nil {
@@ -1013,27 +507,27 @@ func (p *Parser) parseOperation(stackName string, inBlock bool) (*StackOp, error
 			}
 		}
 		
-		_, err := p.expect(TokRParen)
+		_, err := p.expect(lexer.TokRParen)
 		if err != nil {
 			return nil, err
 		}
 		
 		// Check for :var after take(timeout)
-		if (op == "take" || op == "pop") && p.peek().Type == TokColon {
+		if (op == "take" || op == "pop") && p.peek().Type == lexer.TokColon {
 			p.advance() // consume :
-			varTok, err := p.expect(TokIdent)
+			varTok, err := p.expect(lexer.TokIdent)
 			if err != nil {
 				return nil, fmt.Errorf("line %d: expected variable name after %s():", p.peek().Line, op)
 			}
 			target = varTok.Value
 		}
-	} else if next.Type == TokColon {
+	} else if next.Type == lexer.TokColon {
 		// op:arg - colon form
 		p.advance() // consume :
 		
 		// For pop and take, the arg after : is a variable target
 		if op == "pop" || op == "take" {
-			varTok, err := p.expect(TokIdent)
+			varTok, err := p.expect(lexer.TokIdent)
 			if err != nil {
 				return nil, fmt.Errorf("line %d: expected variable name after %s:", p.peek().Line, op)
 			}
@@ -1048,57 +542,57 @@ func (p *Parser) parseOperation(stackName string, inBlock bool) (*StackOp, error
 	}
 	// else: op with no arguments
 	
-	return &StackOp{Stack: stackName, Op: op, Args: args, Target: target}, nil
+	return &ast.StackOp{Stack: stackName, Op: op, Args: args, Target: target}, nil
 }
 
-func isOperationToken(t TokenType) bool {
+func isOperationToken(t lexer.TokenType) bool {
 	switch t {
-	case TokPush, TokPop, TokPeek, TokTake, TokBring, TokWalk, TokFilter, 
-	     TokReduce, TokMap, TokPerspective, TokFreeze, TokAdvance,
-	     TokAttach, TokDetach, TokSet, TokGet,
+	case lexer.TokPush, lexer.TokPop, lexer.TokPeek, lexer.TokTake, lexer.TokBring, lexer.TokWalk, lexer.TokFilter, 
+	     lexer.TokReduce, lexer.TokMap, lexer.TokPerspective, lexer.TokFreeze, lexer.TokAdvance,
+	     lexer.TokAttach, lexer.TokDetach, lexer.TokSet, lexer.TokGet,
 	     // Arithmetic
-	     TokAdd, TokSub, TokMul, TokDiv, TokMod,
+	     lexer.TokAdd, lexer.TokSub, lexer.TokMul, lexer.TokDiv, lexer.TokMod,
 	     // Unary
-	     TokNeg, TokAbs, TokInc, TokDec,
+	     lexer.TokNeg, lexer.TokAbs, lexer.TokInc, lexer.TokDec,
 	     // Min/Max
-	     TokMin, TokMax,
+	     lexer.TokMin, lexer.TokMax,
 	     // Bitwise
-	     TokBand, TokBor, TokBxor, TokBnot, TokShl, TokShr,
+	     lexer.TokBand, lexer.TokBor, lexer.TokBxor, lexer.TokBnot, lexer.TokShl, lexer.TokShr,
 	     // Comparison
-	     TokEq, TokNe, TokLt, TokGt, TokLe, TokGe,
+	     lexer.TokEq, lexer.TokNe, lexer.TokLt, lexer.TokGt, lexer.TokLe, lexer.TokGe,
 	     // Stack manipulation
-	     TokDup, TokDrop, TokSwap, TokOver, TokRot,
+	     lexer.TokDup, lexer.TokDrop, lexer.TokSwap, lexer.TokOver, lexer.TokRot,
 	     // I/O
-	     TokPrint, TokDotOp,
+	     lexer.TokPrint, lexer.TokDotOp,
 	     // Return stack
-	     TokToR, TokFromR,
+	     lexer.TokToR, lexer.TokFromR,
 	     // Variables
-	     TokLet,
+	     lexer.TokLet,
 	     // Generic identifier
-	     TokIdent:
+	     lexer.TokIdent:
 		return true
 	}
 	return false
 }
 
-func (p *Parser) parseStackDecl(name string) (Stmt, error) {
+func (p *Parser) parseStackDecl(name string) (ast.Stmt, error) {
 	// stack.new(type) or stack.new(type, cap: n)
-	_, err := p.expect(TokStack)
+	_, err := p.expect(lexer.TokStack)
 	if err != nil {
 		return nil, err
 	}
 	
-	_, err = p.expect(TokDot)
+	_, err = p.expect(lexer.TokDot)
 	if err != nil {
 		return nil, err
 	}
 	
-	_, err = p.expect(TokNew)
+	_, err = p.expect(lexer.TokNew)
 	if err != nil {
 		return nil, err
 	}
 	
-	_, err = p.expect(TokLParen)
+	_, err = p.expect(lexer.TokLParen)
 	if err != nil {
 		return nil, err
 	}
@@ -1107,36 +601,36 @@ func (p *Parser) parseStackDecl(name string) (Stmt, error) {
 	typeTok := p.advance()
 	elemType := typeTok.Value
 	
-	decl := &StackDecl{
+	decl := &ast.StackDecl{
 		Name:        name,
 		ElementType: elemType,
 		Perspective: "LIFO",
 	}
 	
 	// Optional: cap, perspective
-	for p.peek().Type == TokComma {
+	for p.peek().Type == lexer.TokComma {
 		p.advance() // consume ,
 		
 		optTok := p.peek()
-		if optTok.Type == TokCap {
+		if optTok.Type == lexer.TokCap {
 			p.advance()
-			_, err = p.expect(TokColon)
+			_, err = p.expect(lexer.TokColon)
 			if err != nil {
 				return nil, err
 			}
-			capTok, err := p.expect(TokInt)
+			capTok, err := p.expect(lexer.TokInt)
 			if err != nil {
 				return nil, err
 			}
 			fmt.Sscanf(capTok.Value, "%d", &decl.Capacity)
-		} else if optTok.Type == TokLIFO || optTok.Type == TokFIFO || 
-		          optTok.Type == TokIndexed || optTok.Type == TokHash {
+		} else if optTok.Type == lexer.TokLIFO || optTok.Type == lexer.TokFIFO || 
+		          optTok.Type == lexer.TokIndexed || optTok.Type == lexer.TokHash {
 			p.advance()
 			decl.Perspective = optTok.Value
 		}
 	}
 	
-	_, err = p.expect(TokRParen)
+	_, err = p.expect(lexer.TokRParen)
 	if err != nil {
 		return nil, err
 	}
@@ -1148,19 +642,19 @@ func (p *Parser) parseStackDecl(name string) (Stmt, error) {
 // or: var name, name2 type = value, value2
 // or: var name, name2 type (zero init)
 // or: var name = value (type inference)
-func (p *Parser) parseVarDecl() (Stmt, error) {
+func (p *Parser) parseVarDecl() (ast.Stmt, error) {
 	p.advance() // consume 'var'
 	
 	// Parse names
 	var names []string
 	for {
-		nameTok, err := p.expect(TokIdent)
+		nameTok, err := p.expect(lexer.TokIdent)
 		if err != nil {
 			return nil, fmt.Errorf("line %d: expected variable name", p.peek().Line)
 		}
 		names = append(names, nameTok.Value)
 		
-		if p.peek().Type == TokComma {
+		if p.peek().Type == lexer.TokComma {
 			p.advance() // consume comma
 			continue
 		}
@@ -1168,7 +662,7 @@ func (p *Parser) parseVarDecl() (Stmt, error) {
 	}
 	
 	var typeName string
-	var values []Expr
+	var values []ast.Expr
 	
 	// Check for type or equals
 	next := p.peek()
@@ -1179,7 +673,7 @@ func (p *Parser) parseVarDecl() (Stmt, error) {
 		p.advance()
 		
 		// Optional initialization
-		if p.peek().Type == TokEquals {
+		if p.peek().Type == lexer.TokEquals {
 			p.advance() // consume =
 			for i := 0; i < len(names); i++ {
 				expr, err := p.parseExpr()
@@ -1189,7 +683,7 @@ func (p *Parser) parseVarDecl() (Stmt, error) {
 				values = append(values, expr)
 				
 				if i < len(names)-1 {
-					if p.peek().Type == TokComma {
+					if p.peek().Type == lexer.TokComma {
 						p.advance()
 					} else {
 						return nil, fmt.Errorf("line %d: expected %d values for %d variables", p.peek().Line, len(names), len(names))
@@ -1197,7 +691,7 @@ func (p *Parser) parseVarDecl() (Stmt, error) {
 				}
 			}
 		}
-	} else if next.Type == TokEquals {
+	} else if next.Type == lexer.TokEquals {
 		// Type inference from value
 		p.advance() // consume =
 		for i := 0; i < len(names); i++ {
@@ -1208,7 +702,7 @@ func (p *Parser) parseVarDecl() (Stmt, error) {
 			values = append(values, expr)
 			
 			if i < len(names)-1 {
-				if p.peek().Type == TokComma {
+				if p.peek().Type == lexer.TokComma {
 					p.advance()
 				} else {
 					return nil, fmt.Errorf("line %d: expected %d values for %d variables", p.peek().Line, len(names), len(names))
@@ -1219,30 +713,30 @@ func (p *Parser) parseVarDecl() (Stmt, error) {
 		return nil, fmt.Errorf("line %d: expected type or = in var declaration", next.Line)
 	}
 	
-	return &VarDecl{Names: names, Type: typeName, Values: values}, nil
+	return &ast.VarDecl{Names: names, Type: typeName, Values: values}, nil
 }
 
 // parseLetAssign: let:name (assigns from stack top to named variable)
-func (p *Parser) parseLetAssign(stack string) (Stmt, error) {
+func (p *Parser) parseLetAssign(stack string) (ast.Stmt, error) {
 	p.advance() // consume 'let'
 	
 	// Expect colon
-	if p.peek().Type != TokColon {
+	if p.peek().Type != lexer.TokColon {
 		return nil, fmt.Errorf("line %d: expected ':' after let", p.peek().Line)
 	}
 	p.advance() // consume ':'
 	
 	// Expect name
-	nameTok, err := p.expect(TokIdent)
+	nameTok, err := p.expect(lexer.TokIdent)
 	if err != nil {
 		return nil, fmt.Errorf("line %d: expected variable name after let:", p.peek().Line)
 	}
 	
-	return &LetAssign{Name: nameTok.Value, Stack: stack}, nil
+	return &ast.LetAssign{Name: nameTok.Value, Stack: stack}, nil
 }
 
 // parseIfStmt: if (condition) { body } elseif (cond) { body } else { body }
-func (p *Parser) parseIfStmt() (Stmt, error) {
+func (p *Parser) parseIfStmt() (ast.Stmt, error) {
 	p.advance() // consume 'if'
 	
 	// Parse condition in parentheses
@@ -1257,7 +751,7 @@ func (p *Parser) parseIfStmt() (Stmt, error) {
 		return nil, err
 	}
 	
-	stmt := &IfStmt{
+	stmt := &ast.IfStmt{
 		Condition: cond,
 		Body:      body,
 	}
@@ -1267,7 +761,7 @@ func (p *Parser) parseIfStmt() (Stmt, error) {
 		p.skipNewlines()
 		tok := p.peek()
 		
-		if tok.Type == TokElseIf {
+		if tok.Type == lexer.TokElseIf {
 			p.advance() // consume 'elseif'
 			
 			elseCond, err := p.parseCondition()
@@ -1280,11 +774,11 @@ func (p *Parser) parseIfStmt() (Stmt, error) {
 				return nil, err
 			}
 			
-			stmt.ElseIfs = append(stmt.ElseIfs, ElseIf{
+			stmt.ElseIfs = append(stmt.ElseIfs, ast.ElseIf{
 				Condition: elseCond,
 				Body:      elseBody,
 			})
-		} else if tok.Type == TokElse {
+		} else if tok.Type == lexer.TokElse {
 			p.advance() // consume 'else'
 			
 			elseBody, err := p.parseBlock()
@@ -1303,7 +797,7 @@ func (p *Parser) parseIfStmt() (Stmt, error) {
 }
 
 // parseWhileStmt: while (condition) { body }
-func (p *Parser) parseWhileStmt() (Stmt, error) {
+func (p *Parser) parseWhileStmt() (ast.Stmt, error) {
 	p.advance() // consume 'while'
 	
 	cond, err := p.parseCondition()
@@ -1316,18 +810,18 @@ func (p *Parser) parseWhileStmt() (Stmt, error) {
 		return nil, err
 	}
 	
-	return &WhileStmt{
+	return &ast.WhileStmt{
 		Condition: cond,
 		Body:      body,
 	}, nil
 }
 
 // parseForStmt: @stack for{ body } or @stack for{|v| body } or @stack.fifo for{|i,v| body }
-func (p *Parser) parseForStmt(stack, perspective string) (Stmt, error) {
+func (p *Parser) parseForStmt(stack, perspective string) (ast.Stmt, error) {
 	p.advance() // consume 'for'
 	
 	// Expect {
-	if p.peek().Type != TokLBrace {
+	if p.peek().Type != lexer.TokLBrace {
 		return nil, fmt.Errorf("line %d: expected '{' after for", p.peek().Line)
 	}
 	p.advance() // consume '{'
@@ -1335,20 +829,20 @@ func (p *Parser) parseForStmt(stack, perspective string) (Stmt, error) {
 	var params []string
 	
 	// Check for |params|
-	if p.peek().Type == TokPipe {
+	if p.peek().Type == lexer.TokPipe {
 		p.advance() // consume first |
 		
 		// Parse parameter names
-		for p.peek().Type != TokPipe && p.peek().Type != TokEOF {
-			if p.peek().Type == TokIdent {
+		for p.peek().Type != lexer.TokPipe && p.peek().Type != lexer.TokEOF {
+			if p.peek().Type == lexer.TokIdent {
 				params = append(params, p.advance().Value)
 			}
-			if p.peek().Type == TokComma {
+			if p.peek().Type == lexer.TokComma {
 				p.advance() // consume comma
 			}
 		}
 		
-		if p.peek().Type != TokPipe {
+		if p.peek().Type != lexer.TokPipe {
 			return nil, fmt.Errorf("line %d: expected '|' to close params", p.peek().Line)
 		}
 		p.advance() // consume closing |
@@ -1357,8 +851,8 @@ func (p *Parser) parseForStmt(stack, perspective string) (Stmt, error) {
 	p.skipNewlines()
 	
 	// Parse body
-	var body []Stmt
-	for p.peek().Type != TokRBrace && p.peek().Type != TokEOF {
+	var body []ast.Stmt
+	for p.peek().Type != lexer.TokRBrace && p.peek().Type != lexer.TokEOF {
 		stmt, err := p.parseStmt()
 		if err != nil {
 			return nil, err
@@ -1369,12 +863,12 @@ func (p *Parser) parseForStmt(stack, perspective string) (Stmt, error) {
 		p.skipNewlines()
 	}
 	
-	if p.peek().Type != TokRBrace {
+	if p.peek().Type != lexer.TokRBrace {
 		return nil, fmt.Errorf("line %d: expected '}' to close for block", p.peek().Line)
 	}
 	p.advance() // consume '}'
 	
-	return &ForStmt{
+	return &ast.ForStmt{
 		Stack:       stack,
 		Perspective: perspective,
 		Params:      params,
@@ -1383,50 +877,50 @@ func (p *Parser) parseForStmt(stack, perspective string) (Stmt, error) {
 }
 
 // parseFuncDecl: func name(params) returnType { body }
-func (p *Parser) parseFuncDecl(canFail bool) (Stmt, error) {
+func (p *Parser) parseFuncDecl(canFail bool) (ast.Stmt, error) {
 	p.advance() // consume 'func'
 	
 	// Function name
-	nameTok, err := p.expect(TokIdent)
+	nameTok, err := p.expect(lexer.TokIdent)
 	if err != nil {
 		return nil, fmt.Errorf("line %d: expected function name", p.peek().Line)
 	}
 	
 	// Parameters
-	if p.peek().Type != TokLParen {
+	if p.peek().Type != lexer.TokLParen {
 		return nil, fmt.Errorf("line %d: expected '(' after function name", p.peek().Line)
 	}
 	p.advance() // consume '('
 	
-	var params []FuncParam
-	for p.peek().Type != TokRParen && p.peek().Type != TokEOF {
+	var params []ast.FuncParam
+	for p.peek().Type != lexer.TokRParen && p.peek().Type != lexer.TokEOF {
 		// param name
-		paramName, err := p.expect(TokIdent)
+		paramName, err := p.expect(lexer.TokIdent)
 		if err != nil {
 			return nil, fmt.Errorf("line %d: expected parameter name", p.peek().Line)
 		}
 		
 		// param type
 		paramType := p.advance()
-		if !isTypeToken(paramType.Type) && paramType.Type != TokIdent {
+		if !isTypeToken(paramType.Type) && paramType.Type != lexer.TokIdent {
 			return nil, fmt.Errorf("line %d: expected parameter type", p.peek().Line)
 		}
 		
-		params = append(params, FuncParam{Name: paramName.Value, Type: paramType.Value})
+		params = append(params, ast.FuncParam{Name: paramName.Value, Type: paramType.Value})
 		
-		if p.peek().Type == TokComma {
+		if p.peek().Type == lexer.TokComma {
 			p.advance()
 		}
 	}
 	
-	if p.peek().Type != TokRParen {
+	if p.peek().Type != lexer.TokRParen {
 		return nil, fmt.Errorf("line %d: expected ')' after parameters", p.peek().Line)
 	}
 	p.advance() // consume ')'
 	
 	// Optional return type
 	var returnType string
-	if p.peek().Type != TokLBrace {
+	if p.peek().Type != lexer.TokLBrace {
 		retTok := p.advance()
 		returnType = retTok.Value
 	}
@@ -1437,7 +931,7 @@ func (p *Parser) parseFuncDecl(canFail bool) (Stmt, error) {
 		return nil, err
 	}
 	
-	return &FuncDecl{
+	return &ast.FuncDecl{
 		Name:       nameTok.Value,
 		Params:     params,
 		ReturnType: returnType,
@@ -1447,13 +941,13 @@ func (p *Parser) parseFuncDecl(canFail bool) (Stmt, error) {
 }
 
 // parseReturnStmt: return or return expr
-func (p *Parser) parseReturnStmt() (Stmt, error) {
+func (p *Parser) parseReturnStmt() (ast.Stmt, error) {
 	p.advance() // consume 'return'
 	
 	// Check if there's a value to return
 	next := p.peek()
-	if next.Type == TokNewline || next.Type == TokRBrace || next.Type == TokEOF {
-		return &ReturnStmt{Value: nil}, nil
+	if next.Type == lexer.TokNewline || next.Type == lexer.TokRBrace || next.Type == lexer.TokEOF {
+		return &ast.ReturnStmt{Value: nil}, nil
 	}
 	
 	// Parse return value
@@ -1462,32 +956,32 @@ func (p *Parser) parseReturnStmt() (Stmt, error) {
 		return nil, err
 	}
 	
-	return &ReturnStmt{Value: expr}, nil
+	return &ast.ReturnStmt{Value: expr}, nil
 }
 
 // parsePanicStmt: panic or panic:msg or panic expr
-func (p *Parser) parsePanicStmt() (Stmt, error) {
+func (p *Parser) parsePanicStmt() (ast.Stmt, error) {
 	p.advance() // consume 'panic'
 	
 	next := p.peek()
 	
 	// Bare panic (re-panic in recover context)
-	if next.Type == TokNewline || next.Type == TokRBrace || next.Type == TokEOF {
-		return &PanicStmt{Value: nil}, nil
+	if next.Type == lexer.TokNewline || next.Type == lexer.TokRBrace || next.Type == lexer.TokEOF {
+		return &ast.PanicStmt{Value: nil}, nil
 	}
 	
 	// panic:msg shorthand
-	if next.Type == TokColon {
+	if next.Type == lexer.TokColon {
 		p.advance() // consume ':'
 		
 		// Accept identifier or string
 		tok := p.peek()
-		if tok.Type == TokIdent {
+		if tok.Type == lexer.TokIdent {
 			p.advance()
-			return &PanicStmt{Value: &StringLit{Value: tok.Value}}, nil
-		} else if tok.Type == TokString {
+			return &ast.PanicStmt{Value: &ast.StringLit{Value: tok.Value}}, nil
+		} else if tok.Type == lexer.TokString {
 			p.advance()
-			return &PanicStmt{Value: &StringLit{Value: tok.Value}}, nil
+			return &ast.PanicStmt{Value: &ast.StringLit{Value: tok.Value}}, nil
 		}
 		
 		// Parse as expression
@@ -1495,7 +989,7 @@ func (p *Parser) parsePanicStmt() (Stmt, error) {
 		if err != nil {
 			return nil, err
 		}
-		return &PanicStmt{Value: expr}, nil
+		return &ast.PanicStmt{Value: expr}, nil
 	}
 	
 	// panic expr
@@ -1504,59 +998,59 @@ func (p *Parser) parsePanicStmt() (Stmt, error) {
 		return nil, err
 	}
 	
-	return &PanicStmt{Value: expr}, nil
+	return &ast.PanicStmt{Value: expr}, nil
 }
 
 // parseStatusStmt: status:label or status:label(value)
 // Sets the status for the enclosing consider block
-func (p *Parser) parseStatusStmt() (Stmt, error) {
+func (p *Parser) parseStatusStmt() (ast.Stmt, error) {
 	p.advance() // consume 'status'
 	
 	// Expect colon
-	if p.peek().Type != TokColon {
+	if p.peek().Type != lexer.TokColon {
 		return nil, fmt.Errorf("line %d: expected ':' after status", p.peek().Line)
 	}
 	p.advance() // consume ':'
 	
 	// Parse label (identifier)
 	labelTok := p.peek()
-	if labelTok.Type != TokIdent {
+	if labelTok.Type != lexer.TokIdent {
 		return nil, fmt.Errorf("line %d: expected status label", p.peek().Line)
 	}
 	label := p.advance().Value
 	
 	// Optional value in parentheses
-	var value Expr
-	if p.peek().Type == TokLParen {
+	var value ast.Expr
+	if p.peek().Type == lexer.TokLParen {
 		p.advance() // consume '('
 		var err error
 		value, err = p.parseExpr()
 		if err != nil {
 			return nil, err
 		}
-		if p.peek().Type != TokRParen {
+		if p.peek().Type != lexer.TokRParen {
 			return nil, fmt.Errorf("line %d: expected ')' after status value", p.peek().Line)
 		}
 		p.advance() // consume ')'
 	}
 	
-	return &StatusStmt{Label: label, Value: value}, nil
+	return &ast.StatusStmt{Label: label, Value: value}, nil
 }
 
 // parseTryStmt: try { body } catch { handler } or try { body } catch |err| { handler }
 // Optionally: try { body } finally { cleanup }
 // Or: try { body } catch { handler } finally { cleanup }
-func (p *Parser) parseTryStmt() (Stmt, error) {
+func (p *Parser) parseTryStmt() (ast.Stmt, error) {
 	p.advance() // consume 'try'
 	
 	// Parse try body
-	if _, err := p.expect(TokLBrace); err != nil {
+	if _, err := p.expect(lexer.TokLBrace); err != nil {
 		return nil, fmt.Errorf("line %d: expected '{' after try", p.peek().Line)
 	}
 	p.skipNewlines()
 	
-	var tryBody []Stmt
-	for p.peek().Type != TokRBrace && p.peek().Type != TokEOF {
+	var tryBody []ast.Stmt
+	for p.peek().Type != lexer.TokRBrace && p.peek().Type != lexer.TokEOF {
 		stmt, err := p.parseStmt()
 		if err != nil {
 			return nil, err
@@ -1567,41 +1061,41 @@ func (p *Parser) parseTryStmt() (Stmt, error) {
 		p.skipNewlines()
 	}
 	
-	if _, err := p.expect(TokRBrace); err != nil {
+	if _, err := p.expect(lexer.TokRBrace); err != nil {
 		return nil, fmt.Errorf("line %d: expected '}' to close try block", p.peek().Line)
 	}
 	p.skipNewlines()
 	
 	var errName string
-	var catchBody []Stmt
-	var finallyBody []Stmt
+	var catchBody []ast.Stmt
+	var finallyBody []ast.Stmt
 	
 	// Check for catch
-	if p.peek().Type == TokCatch {
+	if p.peek().Type == lexer.TokCatch {
 		p.advance() // consume 'catch'
 		p.skipNewlines()
 		
 		// Check for |err| binding
-		if p.peek().Type == TokPipe {
+		if p.peek().Type == lexer.TokPipe {
 			p.advance() // consume '|'
-			nameTok, err := p.expect(TokIdent)
+			nameTok, err := p.expect(lexer.TokIdent)
 			if err != nil {
 				return nil, fmt.Errorf("line %d: expected identifier in catch binding", p.peek().Line)
 			}
 			errName = nameTok.Value
-			if _, err := p.expect(TokPipe); err != nil {
+			if _, err := p.expect(lexer.TokPipe); err != nil {
 				return nil, fmt.Errorf("line %d: expected '|' to close catch binding", p.peek().Line)
 			}
 			p.skipNewlines()
 		}
 		
 		// Parse catch body
-		if _, err := p.expect(TokLBrace); err != nil {
+		if _, err := p.expect(lexer.TokLBrace); err != nil {
 			return nil, fmt.Errorf("line %d: expected '{' after catch", p.peek().Line)
 		}
 		p.skipNewlines()
 		
-		for p.peek().Type != TokRBrace && p.peek().Type != TokEOF {
+		for p.peek().Type != lexer.TokRBrace && p.peek().Type != lexer.TokEOF {
 			stmt, err := p.parseStmt()
 			if err != nil {
 				return nil, err
@@ -1612,24 +1106,24 @@ func (p *Parser) parseTryStmt() (Stmt, error) {
 			p.skipNewlines()
 		}
 		
-		if _, err := p.expect(TokRBrace); err != nil {
+		if _, err := p.expect(lexer.TokRBrace); err != nil {
 			return nil, fmt.Errorf("line %d: expected '}' to close catch block", p.peek().Line)
 		}
 		p.skipNewlines()
 	}
 	
 	// Check for finally
-	if p.peek().Type == TokFinally {
+	if p.peek().Type == lexer.TokFinally {
 		p.advance() // consume 'finally'
 		p.skipNewlines()
 		
 		// Parse finally body
-		if _, err := p.expect(TokLBrace); err != nil {
+		if _, err := p.expect(lexer.TokLBrace); err != nil {
 			return nil, fmt.Errorf("line %d: expected '{' after finally", p.peek().Line)
 		}
 		p.skipNewlines()
 		
-		for p.peek().Type != TokRBrace && p.peek().Type != TokEOF {
+		for p.peek().Type != lexer.TokRBrace && p.peek().Type != lexer.TokEOF {
 			stmt, err := p.parseStmt()
 			if err != nil {
 				return nil, err
@@ -1640,7 +1134,7 @@ func (p *Parser) parseTryStmt() (Stmt, error) {
 			p.skipNewlines()
 		}
 		
-		if _, err := p.expect(TokRBrace); err != nil {
+		if _, err := p.expect(lexer.TokRBrace); err != nil {
 			return nil, fmt.Errorf("line %d: expected '}' to close finally block", p.peek().Line)
 		}
 	}
@@ -1650,7 +1144,7 @@ func (p *Parser) parseTryStmt() (Stmt, error) {
 		return nil, fmt.Errorf("line %d: try must have catch or finally block", p.peek().Line)
 	}
 	
-	return &TryStmt{
+	return &ast.TryStmt{
 		Body:    tryBody,
 		ErrName: errName,
 		Catch:   catchBody,
@@ -1659,27 +1153,27 @@ func (p *Parser) parseTryStmt() (Stmt, error) {
 }
 
 // parseSpawnOp: @spawn peek play, @spawn pop play pop play, etc.
-// Returns single SpawnOp or SpawnBlock for multiple ops
-func (p *Parser) parseSpawnOp() (Stmt, error) {
-	var ops []*SpawnOp
+// Returns single ast.SpawnOp or SpawnBlock for multiple ops
+func (p *Parser) parseSpawnOp() (ast.Stmt, error) {
+	var ops []*ast.SpawnOp
 	
 	for {
 		tok := p.peek()
 		
 		// Check for end of line
-		if tok.Type == TokNewline || tok.Type == TokEOF || tok.Type == TokRBrace {
+		if tok.Type == lexer.TokNewline || tok.Type == lexer.TokEOF || tok.Type == lexer.TokRBrace {
 			break
 		}
 		
 		var op string
 		switch tok.Type {
-		case TokPop:
+		case lexer.TokPop:
 			op = "pop"
 			p.advance()
-		case TokPeek:
+		case lexer.TokPeek:
 			op = "peek"
 			p.advance()
-		case TokIdent:
+		case lexer.TokIdent:
 			op = p.advance().Value // "len", "clear", etc.
 		default:
 			if len(ops) == 0 {
@@ -1694,24 +1188,24 @@ func (p *Parser) parseSpawnOp() (Stmt, error) {
 		
 		// Check for "play" following peek/pop
 		play := false
-		var args []Expr
+		var args []ast.Expr
 		
 		if op == "peek" || op == "pop" {
-			if p.peek().Type == TokIdent && p.peek().Value == "play" {
+			if p.peek().Type == lexer.TokIdent && p.peek().Value == "play" {
 				p.advance() // consume "play"
 				play = true
 				
 				// Check for play(args)
-				if p.peek().Type == TokLParen {
+				if p.peek().Type == lexer.TokLParen {
 					p.advance() // consume '('
-					if p.peek().Type != TokRParen {
+					if p.peek().Type != lexer.TokRParen {
 						arg, err := p.parseExpr()
 						if err != nil {
 							return nil, err
 						}
 						args = append(args, arg)
 						
-						for p.peek().Type == TokComma {
+						for p.peek().Type == lexer.TokComma {
 							p.advance()
 							arg, err := p.parseExpr()
 							if err != nil {
@@ -1720,14 +1214,14 @@ func (p *Parser) parseSpawnOp() (Stmt, error) {
 							args = append(args, arg)
 						}
 					}
-					if _, err := p.expect(TokRParen); err != nil {
+					if _, err := p.expect(lexer.TokRParen); err != nil {
 						return nil, err
 					}
 				}
 			}
 		}
 		
-		ops = append(ops, &SpawnOp{Op: op, Play: play, Args: args})
+		ops = append(ops, &ast.SpawnOp{Op: op, Play: play, Args: args})
 	}
 	
 	if len(ops) == 0 {
@@ -1739,17 +1233,17 @@ func (p *Parser) parseSpawnOp() (Stmt, error) {
 	}
 	
 	// Multiple ops - wrap in a block
-	stmts := make([]Stmt, len(ops))
+	stmts := make([]ast.Stmt, len(ops))
 	for i, op := range ops {
 		stmts[i] = op
 	}
-	return &Block{Stmts: stmts}, nil
+	return &ast.Block{Stmts: stmts}, nil
 }
 
 // parseCondition: (expr op expr) or (expr)
-func (p *Parser) parseCondition() (Expr, error) {
+func (p *Parser) parseCondition() (ast.Expr, error) {
 	// Expect opening paren
-	if p.peek().Type != TokLParen {
+	if p.peek().Type != lexer.TokLParen {
 		return nil, fmt.Errorf("line %d: expected '(' for condition", p.peek().Line)
 	}
 	p.advance() // consume '('
@@ -1764,21 +1258,21 @@ func (p *Parser) parseCondition() (Expr, error) {
 	tok := p.peek()
 	var op string
 	switch tok.Type {
-	case TokSymGt:
+	case lexer.TokSymGt:
 		op = ">"
-	case TokSymLt:
+	case lexer.TokSymLt:
 		op = "<"
-	case TokSymGe:
+	case lexer.TokSymGe:
 		op = ">="
-	case TokSymLe:
+	case lexer.TokSymLe:
 		op = "<="
-	case TokSymEq:
+	case lexer.TokSymEq:
 		op = "=="
-	case TokSymNe:
+	case lexer.TokSymNe:
 		op = "!="
 	default:
 		// Just a single expression (truthy check)
-		if p.peek().Type != TokRParen {
+		if p.peek().Type != lexer.TokRParen {
 			return nil, fmt.Errorf("line %d: expected ')' or comparison operator", p.peek().Line)
 		}
 		p.advance() // consume ')'
@@ -1794,34 +1288,34 @@ func (p *Parser) parseCondition() (Expr, error) {
 	}
 	
 	// Expect closing paren
-	if p.peek().Type != TokRParen {
+	if p.peek().Type != lexer.TokRParen {
 		return nil, fmt.Errorf("line %d: expected ')' after condition", p.peek().Line)
 	}
 	p.advance() // consume ')'
 	
-	return &BinaryExpr{Left: left, Op: op, Right: right}, nil
+	return &ast.BinaryExpr{Left: left, Op: op, Right: right}, nil
 }
 
 // parseBlock: { statements }
-func (p *Parser) parseBlock() ([]Stmt, error) {
+func (p *Parser) parseBlock() ([]ast.Stmt, error) {
 	p.skipNewlines()
 	
-	if p.peek().Type != TokLBrace {
+	if p.peek().Type != lexer.TokLBrace {
 		return nil, fmt.Errorf("line %d: expected '{' for block", p.peek().Line)
 	}
 	p.advance() // consume '{'
 	
-	var stmts []Stmt
+	var stmts []ast.Stmt
 	
 	for {
 		p.skipNewlines()
 		
-		if p.peek().Type == TokRBrace {
+		if p.peek().Type == lexer.TokRBrace {
 			p.advance() // consume '}'
 			break
 		}
 		
-		if p.peek().Type == TokEOF {
+		if p.peek().Type == lexer.TokEOF {
 			return nil, fmt.Errorf("unexpected end of file, expected '}'")
 		}
 		
@@ -1839,19 +1333,19 @@ func (p *Parser) parseBlock() ([]Stmt, error) {
 
 // parseConsider: .consider( case: handler, ... )
 // Parses the consider block after a stack block
-func (p *Parser) parseConsider(block *StackBlock) (*ConsiderStmt, error) {
+func (p *Parser) parseConsider(block *ast.StackBlock) (*ast.ConsiderStmt, error) {
 	p.advance() // consume 'consider'
 	
-	if p.peek().Type != TokLParen {
+	if p.peek().Type != lexer.TokLParen {
 		return nil, fmt.Errorf("line %d: expected '(' after 'consider'", p.peek().Line)
 	}
 	p.advance() // consume '('
 	
 	p.skipNewlines()
 	
-	var cases []ConsiderCase
+	var cases []ast.ConsiderCase
 	
-	for p.peek().Type != TokRParen && p.peek().Type != TokEOF {
+	for p.peek().Type != lexer.TokRParen && p.peek().Type != lexer.TokEOF {
 		// Parse case: label: handler or label |bindings|: handler
 		caseStmt, err := p.parseConsiderCase()
 		if err != nil {
@@ -1862,13 +1356,13 @@ func (p *Parser) parseConsider(block *StackBlock) (*ConsiderStmt, error) {
 		p.skipNewlines()
 		
 		// Optional comma between cases
-		if p.peek().Type == TokComma {
+		if p.peek().Type == lexer.TokComma {
 			p.advance()
 			p.skipNewlines()
 		}
 	}
 	
-	if _, err := p.expect(TokRParen); err != nil {
+	if _, err := p.expect(lexer.TokRParen); err != nil {
 		return nil, err
 	}
 	
@@ -1877,19 +1371,19 @@ func (p *Parser) parseConsider(block *StackBlock) (*ConsiderStmt, error) {
 		return nil, fmt.Errorf("line %d: consider block requires at least one case", p.peek().Line)
 	}
 	
-	return &ConsiderStmt{Block: block, Cases: cases}, nil
+	return &ast.ConsiderStmt{Block: block, Cases: cases}, nil
 }
 
 // parseConsiderCase: label: handler or label |bindings|: { handler }
-func (p *Parser) parseConsiderCase() (*ConsiderCase, error) {
+func (p *Parser) parseConsiderCase() (*ast.ConsiderCase, error) {
 	// Parse label: ok, error, notfound, _, or integer
 	var label string
 	
 	tok := p.peek()
 	switch tok.Type {
-	case TokIdent:
+	case lexer.TokIdent:
 		label = p.advance().Value
-	case TokInt:
+	case lexer.TokInt:
 		label = p.advance().Value
 	default:
 		return nil, fmt.Errorf("line %d: expected case label (identifier or integer)", tok.Line)
@@ -1903,29 +1397,29 @@ func (p *Parser) parseConsiderCase() (*ConsiderCase, error) {
 	var bindings []string
 	
 	// Check for |bindings|
-	if p.peek().Type == TokPipe {
+	if p.peek().Type == lexer.TokPipe {
 		p.advance() // consume first |
 		
 		// Parse binding names
-		for p.peek().Type != TokPipe && p.peek().Type != TokEOF {
-			if p.peek().Type != TokIdent {
+		for p.peek().Type != lexer.TokPipe && p.peek().Type != lexer.TokEOF {
+			if p.peek().Type != lexer.TokIdent {
 				return nil, fmt.Errorf("line %d: expected binding name", p.peek().Line)
 			}
 			bindings = append(bindings, p.advance().Value)
 			
-			if p.peek().Type == TokComma {
+			if p.peek().Type == lexer.TokComma {
 				p.advance()
 			}
 		}
 		
-		if p.peek().Type != TokPipe {
+		if p.peek().Type != lexer.TokPipe {
 			return nil, fmt.Errorf("line %d: expected '|' to close bindings", p.peek().Line)
 		}
 		p.advance() // consume closing |
 	}
 	
 	// Expect colon
-	if p.peek().Type != TokColon {
+	if p.peek().Type != lexer.TokColon {
 		return nil, fmt.Errorf("line %d: expected ':' after case label", p.peek().Line)
 	}
 	p.advance() // consume :
@@ -1933,9 +1427,9 @@ func (p *Parser) parseConsiderCase() (*ConsiderCase, error) {
 	p.skipNewlines()
 	
 	// Parse handler: either { block } or single statement/call
-	var handler []Stmt
+	var handler []ast.Stmt
 	
-	if p.peek().Type == TokLBrace {
+	if p.peek().Type == lexer.TokLBrace {
 		// Code block handler
 		stmts, err := p.parseBlock()
 		if err != nil {
@@ -1949,11 +1443,11 @@ func (p *Parser) parseConsiderCase() (*ConsiderCase, error) {
 			return nil, err
 		}
 		if stmt != nil {
-			handler = []Stmt{stmt}
+			handler = []ast.Stmt{stmt}
 		}
 	}
 	
-	return &ConsiderCase{
+	return &ast.ConsiderCase{
 		Label:    label,
 		Bindings: bindings,
 		Handler:  handler,
@@ -1962,10 +1456,10 @@ func (p *Parser) parseConsiderCase() (*ConsiderCase, error) {
 
 // parseSelect: .select( case, case, ... )
 // Parses the select block after a stack block
-func (p *Parser) parseSelect(block *StackBlock) (*SelectStmt, error) {
+func (p *Parser) parseSelect(block *ast.StackBlock) (*ast.SelectStmt, error) {
 	p.advance() // consume 'select'
 	
-	if p.peek().Type != TokLParen {
+	if p.peek().Type != lexer.TokLParen {
 		return nil, fmt.Errorf("line %d: expected '(' after 'select'", p.peek().Line)
 	}
 	p.advance() // consume '('
@@ -1978,9 +1472,9 @@ func (p *Parser) parseSelect(block *StackBlock) (*SelectStmt, error) {
 		defaultStack = block.Stack
 	}
 	
-	var cases []SelectCase
+	var cases []ast.SelectCase
 	
-	for p.peek().Type != TokRParen && p.peek().Type != TokEOF {
+	for p.peek().Type != lexer.TokRParen && p.peek().Type != lexer.TokEOF {
 		// Parse case: @stack {|var| handler} or {|var| handler} (uses default) or _: { default }
 		caseStmt, err := p.parseSelectCase(defaultStack)
 		if err != nil {
@@ -1991,13 +1485,13 @@ func (p *Parser) parseSelect(block *StackBlock) (*SelectStmt, error) {
 		p.skipNewlines()
 		
 		// Optional comma between cases (but we don't require it)
-		if p.peek().Type == TokComma {
+		if p.peek().Type == lexer.TokComma {
 			p.advance()
 			p.skipNewlines()
 		}
 	}
 	
-	if _, err := p.expect(TokRParen); err != nil {
+	if _, err := p.expect(lexer.TokRParen); err != nil {
 		return nil, err
 	}
 	
@@ -2006,30 +1500,30 @@ func (p *Parser) parseSelect(block *StackBlock) (*SelectStmt, error) {
 		return nil, fmt.Errorf("line %d: select block requires at least one case", p.peek().Line)
 	}
 	
-	return &SelectStmt{Block: block, DefaultStack: defaultStack, Cases: cases}, nil
+	return &ast.SelectStmt{Block: block, DefaultStack: defaultStack, Cases: cases}, nil
 }
 
 // parseSelectCase: @stack {|var| handler timeout(...)} or {|var| handler} or _: { default }
-func (p *Parser) parseSelectCase(defaultStack string) (*SelectCase, error) {
+func (p *Parser) parseSelectCase(defaultStack string) (*ast.SelectCase, error) {
 	var stackName string
 	
 	tok := p.peek()
 	
 	// Check for default case: _ or _:
-	if tok.Type == TokIdent && tok.Value == "_" {
+	if tok.Type == lexer.TokIdent && tok.Value == "_" {
 		p.advance() // consume _
 		stackName = "_"
 		
 		// Optional colon after _
-		if p.peek().Type == TokColon {
+		if p.peek().Type == lexer.TokColon {
 			p.advance()
 		}
 		
 		p.skipNewlines()
 		
 		// Parse handler block
-		var handler []Stmt
-		if p.peek().Type == TokLBrace {
+		var handler []ast.Stmt
+		if p.peek().Type == lexer.TokLBrace {
 			stmts, err := p.parseBlock()
 			if err != nil {
 				return nil, err
@@ -2041,20 +1535,20 @@ func (p *Parser) parseSelectCase(defaultStack string) (*SelectCase, error) {
 				return nil, err
 			}
 			if stmt != nil {
-				handler = []Stmt{stmt}
+				handler = []ast.Stmt{stmt}
 			}
 		}
 		
-		return &SelectCase{
+		return &ast.SelectCase{
 			Stack:   "_",
 			Handler: handler,
 		}, nil
 	}
 	
 	// Check for @stack reference or use default
-	if tok.Type == TokStackRef {
+	if tok.Type == lexer.TokStackRef {
 		stackName = p.advance().Value
-	} else if tok.Type == TokLBrace {
+	} else if tok.Type == lexer.TokLBrace {
 		// No stack specified, use default
 		stackName = defaultStack
 		if stackName == "" {
@@ -2065,7 +1559,7 @@ func (p *Parser) parseSelectCase(defaultStack string) (*SelectCase, error) {
 	}
 	
 	// Expect opening brace
-	if p.peek().Type != TokLBrace {
+	if p.peek().Type != lexer.TokLBrace {
 		return nil, fmt.Errorf("line %d: expected '{' after stack reference in select case", p.peek().Line)
 	}
 	p.advance() // consume {
@@ -2075,22 +1569,22 @@ func (p *Parser) parseSelectCase(defaultStack string) (*SelectCase, error) {
 	var bindings []string
 	
 	// Check for |bindings| at start of block
-	if p.peek().Type == TokPipe {
+	if p.peek().Type == lexer.TokPipe {
 		p.advance() // consume first |
 		
 		// Parse binding names
-		for p.peek().Type != TokPipe && p.peek().Type != TokEOF {
-			if p.peek().Type != TokIdent {
+		for p.peek().Type != lexer.TokPipe && p.peek().Type != lexer.TokEOF {
+			if p.peek().Type != lexer.TokIdent {
 				return nil, fmt.Errorf("line %d: expected binding name", p.peek().Line)
 			}
 			bindings = append(bindings, p.advance().Value)
 			
-			if p.peek().Type == TokComma {
+			if p.peek().Type == lexer.TokComma {
 				p.advance()
 			}
 		}
 		
-		if p.peek().Type != TokPipe {
+		if p.peek().Type != lexer.TokPipe {
 			return nil, fmt.Errorf("line %d: expected '|' to close bindings", p.peek().Line)
 		}
 		p.advance() // consume closing |
@@ -2099,16 +1593,16 @@ func (p *Parser) parseSelectCase(defaultStack string) (*SelectCase, error) {
 	p.skipNewlines()
 	
 	// Parse handler statements until we hit timeout() or closing brace
-	var handler []Stmt
-	var timeoutMs Expr
-	var timeoutFn *FnLit
+	var handler []ast.Stmt
+	var timeoutMs ast.Expr
+	var timeoutFn *ast.FnLit
 	
-	for p.peek().Type != TokRBrace && p.peek().Type != TokEOF {
+	for p.peek().Type != lexer.TokRBrace && p.peek().Type != lexer.TokEOF {
 		// Check for timeout(ms, {|| handler})
-		if p.peek().Type == TokTimeout {
+		if p.peek().Type == lexer.TokTimeout {
 			p.advance() // consume timeout
 			
-			if p.peek().Type != TokLParen {
+			if p.peek().Type != lexer.TokLParen {
 				return nil, fmt.Errorf("line %d: expected '(' after timeout", p.peek().Line)
 			}
 			p.advance() // consume (
@@ -2121,12 +1615,12 @@ func (p *Parser) parseSelectCase(defaultStack string) (*SelectCase, error) {
 			timeoutMs = msExpr
 			
 			// Check for comma and handler closure
-			if p.peek().Type == TokComma {
+			if p.peek().Type == lexer.TokComma {
 				p.advance() // consume ,
 				p.skipNewlines()
 				
 				// Parse the timeout handler closure: {|| ... }
-				if p.peek().Type != TokLBrace {
+				if p.peek().Type != lexer.TokLBrace {
 					return nil, fmt.Errorf("line %d: expected '{' for timeout handler", p.peek().Line)
 				}
 				
@@ -2134,14 +1628,14 @@ func (p *Parser) parseSelectCase(defaultStack string) (*SelectCase, error) {
 				if err != nil {
 					return nil, err
 				}
-				if fn, ok := fnExpr.(*FnLit); ok {
+				if fn, ok := fnExpr.(*ast.FnLit); ok {
 					timeoutFn = fn
 				} else {
 					return nil, fmt.Errorf("line %d: timeout handler must be a closure", p.peek().Line)
 				}
 			}
 			
-			if p.peek().Type != TokRParen {
+			if p.peek().Type != lexer.TokRParen {
 				return nil, fmt.Errorf("line %d: expected ')' after timeout", p.peek().Line)
 			}
 			p.advance() // consume )
@@ -2161,12 +1655,12 @@ func (p *Parser) parseSelectCase(defaultStack string) (*SelectCase, error) {
 		p.skipNewlines()
 	}
 	
-	if p.peek().Type != TokRBrace {
+	if p.peek().Type != lexer.TokRBrace {
 		return nil, fmt.Errorf("line %d: expected '}' to close select case", p.peek().Line)
 	}
 	p.advance() // consume }
 	
-	return &SelectCase{
+	return &ast.SelectCase{
 		Stack:     stackName,
 		Bindings:  bindings,
 		Handler:   handler,
@@ -2176,46 +1670,46 @@ func (p *Parser) parseSelectCase(defaultStack string) (*SelectCase, error) {
 }
 
 // parseCompute: .compute({|a, b| ... return x})
-func (p *Parser) parseCompute(block *StackBlock) (*ComputeStmt, error) {
+func (p *Parser) parseCompute(block *ast.StackBlock) (*ast.ComputeStmt, error) {
 	p.advance() // consume 'compute'
 	
-	if p.peek().Type != TokLParen {
+	if p.peek().Type != lexer.TokLParen {
 		return nil, fmt.Errorf("line %d: expected '(' after compute", p.peek().Line)
 	}
 	p.advance() // consume (
 	
 	p.skipNewlines()
 	
-	if p.peek().Type != TokLBrace {
+	if p.peek().Type != lexer.TokLBrace {
 		return nil, fmt.Errorf("line %d: expected '{' to start compute kernel", p.peek().Line)
 	}
 	p.advance() // consume {
 	
 	p.skipNewlines()
 	
-	// Parse optional bindings |a, b| or empty || (TokBarBar)
+	// Parse optional bindings |a, b| or empty || (lexer.TokBarBar)
 	var params []string
-	if p.peek().Type == TokBarBar {
+	if p.peek().Type == lexer.TokBarBar {
 		// Empty bindings ||
 		p.advance() // consume ||
-	} else if p.peek().Type == TokPipe {
+	} else if p.peek().Type == lexer.TokPipe {
 		p.advance() // consume first |
 		
 		// Handle empty bindings with space | |
-		if p.peek().Type != TokPipe {
-			for p.peek().Type != TokPipe && p.peek().Type != TokEOF {
-				if p.peek().Type != TokIdent {
+		if p.peek().Type != lexer.TokPipe {
+			for p.peek().Type != lexer.TokPipe && p.peek().Type != lexer.TokEOF {
+				if p.peek().Type != lexer.TokIdent {
 					return nil, fmt.Errorf("line %d: expected binding name", p.peek().Line)
 				}
 				params = append(params, p.advance().Value)
 				
-				if p.peek().Type == TokComma {
+				if p.peek().Type == lexer.TokComma {
 					p.advance()
 				}
 			}
 		}
 		
-		if p.peek().Type != TokPipe {
+		if p.peek().Type != lexer.TokPipe {
 			return nil, fmt.Errorf("line %d: expected '|' to close bindings", p.peek().Line)
 		}
 		p.advance() // consume closing |
@@ -2224,8 +1718,8 @@ func (p *Parser) parseCompute(block *StackBlock) (*ComputeStmt, error) {
 	p.skipNewlines()
 	
 	// Parse compute body statements (infix mode)
-	var body []Stmt
-	for p.peek().Type != TokRBrace && p.peek().Type != TokEOF {
+	var body []ast.Stmt
+	for p.peek().Type != lexer.TokRBrace && p.peek().Type != lexer.TokEOF {
 		stmt, err := p.parseComputeStmt()
 		if err != nil {
 			return nil, err
@@ -2236,19 +1730,19 @@ func (p *Parser) parseCompute(block *StackBlock) (*ComputeStmt, error) {
 		p.skipNewlines()
 	}
 	
-	if p.peek().Type != TokRBrace {
+	if p.peek().Type != lexer.TokRBrace {
 		return nil, fmt.Errorf("line %d: expected '}' to close compute kernel", p.peek().Line)
 	}
 	p.advance() // consume }
 	
 	p.skipNewlines()
 	
-	if p.peek().Type != TokRParen {
+	if p.peek().Type != lexer.TokRParen {
 		return nil, fmt.Errorf("line %d: expected ')' to close compute", p.peek().Line)
 	}
 	p.advance() // consume )
 	
-	return &ComputeStmt{
+	return &ast.ComputeStmt{
 		StackName: block.Stack,
 		Setup:     block,
 		Params:    params,
@@ -2257,68 +1751,68 @@ func (p *Parser) parseCompute(block *StackBlock) (*ComputeStmt, error) {
 }
 
 // parseComputeStmt: parse a statement inside compute block (infix mode)
-func (p *Parser) parseComputeStmt() (Stmt, error) {
+func (p *Parser) parseComputeStmt() (ast.Stmt, error) {
 	tok := p.peek()
 	
 	// Skip newlines
-	if tok.Type == TokNewline {
+	if tok.Type == lexer.TokNewline {
 		p.advance()
 		return nil, nil
 	}
 	
 	// var x = expr
-	if tok.Type == TokVar {
+	if tok.Type == lexer.TokVar {
 		return p.parseComputeVarDecl()
 	}
 	
 	// return expr, expr, ...
-	if tok.Type == TokReturn {
+	if tok.Type == lexer.TokReturn {
 		return p.parseComputeReturn()
 	}
 	
 	// if condition { ... } else { ... }
-	if tok.Type == TokIf {
+	if tok.Type == lexer.TokIf {
 		return p.parseComputeIf()
 	}
 	
 	// while condition { ... }
-	if tok.Type == TokWhile {
+	if tok.Type == lexer.TokWhile {
 		return p.parseComputeWhile()
 	}
 	
 	// break
-	if tok.Type == TokBreak {
+	if tok.Type == lexer.TokBreak {
 		p.advance()
-		return &BreakStmt{}, nil
+		return &ast.BreakStmt{}, nil
 	}
 	
 	// continue
-	if tok.Type == TokContinue {
+	if tok.Type == lexer.TokContinue {
 		p.advance()
-		return &ContinueStmt{}, nil
+		return &ast.ContinueStmt{}, nil
 	}
 	
 	// identifier = expr (assignment without var)
-	if tok.Type == TokIdent {
+	if tok.Type == lexer.TokIdent {
 		return p.parseComputeAssignOrExpr()
 	}
 	
 	// self.prop[i] = expr (container array write)
-	if tok.Type == TokSelf {
+	if tok.Type == lexer.TokSelf {
 		p.advance() // consume self
 		
 		// Must be self.prop[i] = expr
-		if p.peek().Type != TokDot {
+		if p.peek().Type != lexer.TokDot {
 			return nil, fmt.Errorf("line %d: expected '.' after self for assignment", tok.Line)
 		}
 		p.advance() // consume .
 		
-		if p.peek().Type != TokIdent {
+		if p.peek().Type != lexer.TokIdent {
 			return nil, fmt.Errorf("line %d: expected property name after self.", tok.Line)
 		}
 		member := p.advance().Value
 		
-		if p.peek().Type != TokLBracket {
+		if p.peek().Type != lexer.TokLBracket {
 			return nil, fmt.Errorf("line %d: self.%s is read-only; use self.%s[i] for array write", tok.Line, member, member)
 		}
 		p.advance() // consume [
@@ -2328,12 +1822,12 @@ func (p *Parser) parseComputeStmt() (Stmt, error) {
 			return nil, err
 		}
 		
-		if p.peek().Type != TokRBracket {
+		if p.peek().Type != lexer.TokRBracket {
 			return nil, fmt.Errorf("line %d: expected ']' after index", tok.Line)
 		}
 		p.advance() // consume ]
 		
-		if p.peek().Type != TokEquals {
+		if p.peek().Type != lexer.TokEquals {
 			return nil, fmt.Errorf("line %d: expected '=' for assignment", tok.Line)
 		}
 		p.advance() // consume =
@@ -2343,7 +1837,7 @@ func (p *Parser) parseComputeStmt() (Stmt, error) {
 			return nil, err
 		}
 		
-		return &IndexedAssignStmt{
+		return &ast.IndexedAssignStmt{
 			Target: "self",
 			Member: member,
 			Index:  index,
@@ -2355,37 +1849,37 @@ func (p *Parser) parseComputeStmt() (Stmt, error) {
 }
 
 // parseComputeVarDecl: var x = expr OR var buf[1024]
-func (p *Parser) parseComputeVarDecl() (Stmt, error) {
+func (p *Parser) parseComputeVarDecl() (ast.Stmt, error) {
 	p.advance() // consume var
 	
-	if p.peek().Type != TokIdent {
+	if p.peek().Type != lexer.TokIdent {
 		return nil, fmt.Errorf("line %d: expected variable name after var", p.peek().Line)
 	}
 	name := p.advance().Value
 	
 	// Check for array declaration: var buf[1024]
-	if p.peek().Type == TokLBracket {
+	if p.peek().Type == lexer.TokLBracket {
 		p.advance() // consume [
 		
-		if p.peek().Type != TokInt {
+		if p.peek().Type != lexer.TokInt {
 			return nil, fmt.Errorf("line %d: array size must be an integer literal", p.peek().Line)
 		}
 		sizeStr := p.advance().Value
 		size, _ := strconv.ParseInt(sizeStr, 10, 64)
 		
-		if p.peek().Type != TokRBracket {
+		if p.peek().Type != lexer.TokRBracket {
 			return nil, fmt.Errorf("line %d: expected ']' after array size", p.peek().Line)
 		}
 		p.advance() // consume ]
 		
-		return &ArrayDecl{
+		return &ast.ArrayDecl{
 			Name: name,
 			Size: size,
 		}, nil
 	}
 	
 	// Regular variable: var x = expr
-	if p.peek().Type != TokEquals {
+	if p.peek().Type != lexer.TokEquals {
 		return nil, fmt.Errorf("line %d: expected '=' after variable name", p.peek().Line)
 	}
 	p.advance() // consume =
@@ -2395,22 +1889,22 @@ func (p *Parser) parseComputeVarDecl() (Stmt, error) {
 		return nil, err
 	}
 	
-	return &VarDecl{
+	return &ast.VarDecl{
 		Names:  []string{name},
-		Values: []Expr{expr},
+		Values: []ast.Expr{expr},
 	}, nil
 }
 
 // parseComputeReturn: return expr, expr, ...
-func (p *Parser) parseComputeReturn() (Stmt, error) {
+func (p *Parser) parseComputeReturn() (ast.Stmt, error) {
 	p.advance() // consume return
 	
 	// Check for empty return
-	if p.peek().Type == TokNewline || p.peek().Type == TokRBrace {
-		return &ReturnStmt{Values: nil}, nil
+	if p.peek().Type == lexer.TokNewline || p.peek().Type == lexer.TokRBrace {
+		return &ast.ReturnStmt{Values: nil}, nil
 	}
 	
-	var values []Expr
+	var values []ast.Expr
 	for {
 		expr, err := p.parseInfixExpr()
 		if err != nil {
@@ -2418,17 +1912,17 @@ func (p *Parser) parseComputeReturn() (Stmt, error) {
 		}
 		values = append(values, expr)
 		
-		if p.peek().Type != TokComma {
+		if p.peek().Type != lexer.TokComma {
 			break
 		}
 		p.advance() // consume ,
 	}
 	
-	return &ReturnStmt{Values: values}, nil
+	return &ast.ReturnStmt{Values: values}, nil
 }
 
 // parseComputeIf: if condition { ... } else { ... }
-func (p *Parser) parseComputeIf() (Stmt, error) {
+func (p *Parser) parseComputeIf() (ast.Stmt, error) {
 	p.advance() // consume if
 	
 	cond, err := p.parseInfixExpr()
@@ -2438,14 +1932,14 @@ func (p *Parser) parseComputeIf() (Stmt, error) {
 	
 	p.skipNewlines()
 	
-	if p.peek().Type != TokLBrace {
+	if p.peek().Type != lexer.TokLBrace {
 		return nil, fmt.Errorf("line %d: expected '{' after if condition", p.peek().Line)
 	}
 	p.advance() // consume {
 	p.skipNewlines()
 	
-	var thenBody []Stmt
-	for p.peek().Type != TokRBrace && p.peek().Type != TokEOF {
+	var thenBody []ast.Stmt
+	for p.peek().Type != lexer.TokRBrace && p.peek().Type != lexer.TokEOF {
 		stmt, err := p.parseComputeStmt()
 		if err != nil {
 			return nil, err
@@ -2456,25 +1950,25 @@ func (p *Parser) parseComputeIf() (Stmt, error) {
 		p.skipNewlines()
 	}
 	
-	if p.peek().Type != TokRBrace {
+	if p.peek().Type != lexer.TokRBrace {
 		return nil, fmt.Errorf("line %d: expected '}' to close if block", p.peek().Line)
 	}
 	p.advance() // consume }
 	
 	p.skipNewlines()
 	
-	var elseBody []Stmt
-	if p.peek().Type == TokElse {
+	var elseBody []ast.Stmt
+	if p.peek().Type == lexer.TokElse {
 		p.advance() // consume else
 		p.skipNewlines()
 		
-		if p.peek().Type != TokLBrace {
+		if p.peek().Type != lexer.TokLBrace {
 			return nil, fmt.Errorf("line %d: expected '{' after else", p.peek().Line)
 		}
 		p.advance() // consume {
 		p.skipNewlines()
 		
-		for p.peek().Type != TokRBrace && p.peek().Type != TokEOF {
+		for p.peek().Type != lexer.TokRBrace && p.peek().Type != lexer.TokEOF {
 			stmt, err := p.parseComputeStmt()
 			if err != nil {
 				return nil, err
@@ -2485,13 +1979,13 @@ func (p *Parser) parseComputeIf() (Stmt, error) {
 			p.skipNewlines()
 		}
 		
-		if p.peek().Type != TokRBrace {
+		if p.peek().Type != lexer.TokRBrace {
 			return nil, fmt.Errorf("line %d: expected '}' to close else block", p.peek().Line)
 		}
 		p.advance() // consume }
 	}
 	
-	return &IfStmt{
+	return &ast.IfStmt{
 		Condition: cond,
 		Body:      thenBody,
 		Else:      elseBody,
@@ -2499,7 +1993,7 @@ func (p *Parser) parseComputeIf() (Stmt, error) {
 }
 
 // parseComputeWhile: while condition { ... }
-func (p *Parser) parseComputeWhile() (Stmt, error) {
+func (p *Parser) parseComputeWhile() (ast.Stmt, error) {
 	p.advance() // consume while
 	
 	cond, err := p.parseInfixExpr()
@@ -2509,14 +2003,14 @@ func (p *Parser) parseComputeWhile() (Stmt, error) {
 	
 	p.skipNewlines()
 	
-	if p.peek().Type != TokLBrace {
+	if p.peek().Type != lexer.TokLBrace {
 		return nil, fmt.Errorf("line %d: expected '{' after while condition", p.peek().Line)
 	}
 	p.advance() // consume {
 	p.skipNewlines()
 	
-	var body []Stmt
-	for p.peek().Type != TokRBrace && p.peek().Type != TokEOF {
+	var body []ast.Stmt
+	for p.peek().Type != lexer.TokRBrace && p.peek().Type != lexer.TokEOF {
 		stmt, err := p.parseComputeStmt()
 		if err != nil {
 			return nil, err
@@ -2527,34 +2021,34 @@ func (p *Parser) parseComputeWhile() (Stmt, error) {
 		p.skipNewlines()
 	}
 	
-	if p.peek().Type != TokRBrace {
+	if p.peek().Type != lexer.TokRBrace {
 		return nil, fmt.Errorf("line %d: expected '}' to close while block", p.peek().Line)
 	}
 	p.advance() // consume }
 	
-	return &WhileStmt{
+	return &ast.WhileStmt{
 		Condition: cond,
 		Body:      body,
 	}, nil
 }
 
 // parseComputeAssignOrExpr: x = expr, buf[i] = expr, or just expr
-func (p *Parser) parseComputeAssignOrExpr() (Stmt, error) {
+func (p *Parser) parseComputeAssignOrExpr() (ast.Stmt, error) {
 	name := p.advance().Value
 	
 	// Check for indexed assignment: buf[i] = expr
-	if p.peek().Type == TokLBracket {
+	if p.peek().Type == lexer.TokLBracket {
 		p.advance() // consume [
 		index, err := p.parseInfixExpr()
 		if err != nil {
 			return nil, err
 		}
-		if p.peek().Type != TokRBracket {
+		if p.peek().Type != lexer.TokRBracket {
 			return nil, fmt.Errorf("line %d: expected ']' after index", p.peek().Line)
 		}
 		p.advance() // consume ]
 		
-		if p.peek().Type != TokEquals {
+		if p.peek().Type != lexer.TokEquals {
 			return nil, fmt.Errorf("line %d: expected '=' after indexed target", p.peek().Line)
 		}
 		p.advance() // consume =
@@ -2564,7 +2058,7 @@ func (p *Parser) parseComputeAssignOrExpr() (Stmt, error) {
 			return nil, err
 		}
 		
-		return &IndexedAssignStmt{
+		return &ast.IndexedAssignStmt{
 			Target: name,
 			Member: "",  // no member for local array
 			Index:  index,
@@ -2572,13 +2066,13 @@ func (p *Parser) parseComputeAssignOrExpr() (Stmt, error) {
 		}, nil
 	}
 	
-	if p.peek().Type == TokEquals {
+	if p.peek().Type == lexer.TokEquals {
 		p.advance() // consume =
 		expr, err := p.parseInfixExpr()
 		if err != nil {
 			return nil, err
 		}
-		return &AssignStmt{
+		return &ast.AssignStmt{
 			Name:  name,
 			Value: expr,
 		}, nil
@@ -2591,50 +2085,50 @@ func (p *Parser) parseComputeAssignOrExpr() (Stmt, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &ExprStmt{Expr: expr}, nil
+	return &ast.ExprStmt{Expr: expr}, nil
 }
 
 // parseInfixExpr: parse an infix expression (for compute blocks)
 // Precedence: || < && < comparisons < + - < * / %
-func (p *Parser) parseInfixExpr() (Expr, error) {
+func (p *Parser) parseInfixExpr() (ast.Expr, error) {
 	return p.parseInfixOr()
 }
 
-func (p *Parser) parseInfixOr() (Expr, error) {
+func (p *Parser) parseInfixOr() (ast.Expr, error) {
 	left, err := p.parseInfixAnd()
 	if err != nil {
 		return nil, err
 	}
 	
-	for p.peek().Type == TokBarBar {
+	for p.peek().Type == lexer.TokBarBar {
 		p.advance()
 		right, err := p.parseInfixAnd()
 		if err != nil {
 			return nil, err
 		}
-		left = &BinaryExpr{Op: "or", Left: left, Right: right}
+		left = &ast.BinaryExpr{Op: "or", Left: left, Right: right}
 	}
 	return left, nil
 }
 
-func (p *Parser) parseInfixAnd() (Expr, error) {
+func (p *Parser) parseInfixAnd() (ast.Expr, error) {
 	left, err := p.parseInfixComparison()
 	if err != nil {
 		return nil, err
 	}
 	
-	for p.peek().Type == TokAmpAmp {
+	for p.peek().Type == lexer.TokAmpAmp {
 		p.advance()
 		right, err := p.parseInfixComparison()
 		if err != nil {
 			return nil, err
 		}
-		left = &BinaryExpr{Op: "and", Left: left, Right: right}
+		left = &ast.BinaryExpr{Op: "and", Left: left, Right: right}
 	}
 	return left, nil
 }
 
-func (p *Parser) parseInfixComparison() (Expr, error) {
+func (p *Parser) parseInfixComparison() (ast.Expr, error) {
 	left, err := p.parseInfixAddSub()
 	if err != nil {
 		return nil, err
@@ -2643,17 +2137,17 @@ func (p *Parser) parseInfixComparison() (Expr, error) {
 	for {
 		var op string
 		switch p.peek().Type {
-		case TokSymEq:
+		case lexer.TokSymEq:
 			op = "=="
-		case TokSymNe:
+		case lexer.TokSymNe:
 			op = "!="
-		case TokSymLt:
+		case lexer.TokSymLt:
 			op = "<"
-		case TokSymGt:
+		case lexer.TokSymGt:
 			op = ">"
-		case TokSymLe:
+		case lexer.TokSymLe:
 			op = "<="
-		case TokSymGe:
+		case lexer.TokSymGe:
 			op = ">="
 		default:
 			return left, nil
@@ -2663,11 +2157,11 @@ func (p *Parser) parseInfixComparison() (Expr, error) {
 		if err != nil {
 			return nil, err
 		}
-		left = &BinaryExpr{Op: op, Left: left, Right: right}
+		left = &ast.BinaryExpr{Op: op, Left: left, Right: right}
 	}
 }
 
-func (p *Parser) parseInfixAddSub() (Expr, error) {
+func (p *Parser) parseInfixAddSub() (ast.Expr, error) {
 	left, err := p.parseInfixMulDiv()
 	if err != nil {
 		return nil, err
@@ -2676,9 +2170,9 @@ func (p *Parser) parseInfixAddSub() (Expr, error) {
 	for {
 		var op string
 		switch p.peek().Type {
-		case TokPlus:
+		case lexer.TokPlus:
 			op = "+"
-		case TokMinus:
+		case lexer.TokMinus:
 			op = "-"
 		default:
 			return left, nil
@@ -2688,11 +2182,11 @@ func (p *Parser) parseInfixAddSub() (Expr, error) {
 		if err != nil {
 			return nil, err
 		}
-		left = &BinaryExpr{Op: op, Left: left, Right: right}
+		left = &ast.BinaryExpr{Op: op, Left: left, Right: right}
 	}
 }
 
-func (p *Parser) parseInfixMulDiv() (Expr, error) {
+func (p *Parser) parseInfixMulDiv() (ast.Expr, error) {
 	left, err := p.parseInfixUnary()
 	if err != nil {
 		return nil, err
@@ -2701,11 +2195,11 @@ func (p *Parser) parseInfixMulDiv() (Expr, error) {
 	for {
 		var op string
 		switch p.peek().Type {
-		case TokStar:
+		case lexer.TokStar:
 			op = "*"
-		case TokSlash:
+		case lexer.TokSlash:
 			op = "/"
-		case TokPercent:
+		case lexer.TokPercent:
 			op = "%"
 		default:
 			return left, nil
@@ -2715,137 +2209,137 @@ func (p *Parser) parseInfixMulDiv() (Expr, error) {
 		if err != nil {
 			return nil, err
 		}
-		left = &BinaryExpr{Op: op, Left: left, Right: right}
+		left = &ast.BinaryExpr{Op: op, Left: left, Right: right}
 	}
 }
 
-func (p *Parser) parseInfixUnary() (Expr, error) {
+func (p *Parser) parseInfixUnary() (ast.Expr, error) {
 	// Unary minus or not
-	if p.peek().Type == TokMinus {
+	if p.peek().Type == lexer.TokMinus {
 		p.advance()
 		operand, err := p.parseInfixUnary()
 		if err != nil {
 			return nil, err
 		}
-		return &UnaryExpr{Op: "-", Operand: operand}, nil
+		return &ast.UnaryExpr{Op: "-", Operand: operand}, nil
 	}
-	if p.peek().Type == TokBang {
+	if p.peek().Type == lexer.TokBang {
 		p.advance()
 		operand, err := p.parseInfixUnary()
 		if err != nil {
 			return nil, err
 		}
-		return &UnaryExpr{Op: "!", Operand: operand}, nil
+		return &ast.UnaryExpr{Op: "!", Operand: operand}, nil
 	}
 	return p.parseInfixPrimary()
 }
 
-func (p *Parser) parseInfixPrimary() (Expr, error) {
+func (p *Parser) parseInfixPrimary() (ast.Expr, error) {
 	tok := p.peek()
 	
 	switch tok.Type {
-	case TokInt:
+	case lexer.TokInt:
 		p.advance()
 		val, _ := strconv.ParseInt(tok.Value, 10, 64)
-		return &IntLit{Value: val}, nil
+		return &ast.IntLit{Value: val}, nil
 		
-	case TokFloat:
+	case lexer.TokFloat:
 		p.advance()
 		val, _ := strconv.ParseFloat(tok.Value, 64)
-		return &FloatLit{Value: val}, nil
+		return &ast.FloatLit{Value: val}, nil
 		
-	case TokString:
+	case lexer.TokString:
 		p.advance()
-		return &StringLit{Value: tok.Value}, nil
+		return &ast.StringLit{Value: tok.Value}, nil
 		
-	case TokTrue:
+	case lexer.TokTrue:
 		p.advance()
-		return &BoolLit{Value: true}, nil
+		return &ast.BoolLit{Value: true}, nil
 		
-	case TokFalse:
+	case lexer.TokFalse:
 		p.advance()
-		return &BoolLit{Value: false}, nil
+		return &ast.BoolLit{Value: false}, nil
 	
 	// Math keywords that can be used as functions in compute blocks
-	case TokAbs, TokMin, TokMax, TokNeg:
+	case lexer.TokAbs, lexer.TokMin, lexer.TokMax, lexer.TokNeg:
 		p.advance()
 		name := tok.Value
 		// Must be followed by ( for function call syntax
-		if p.peek().Type == TokLParen {
+		if p.peek().Type == lexer.TokLParen {
 			return p.parseInfixCall(name)
 		}
 		// Otherwise treat as identifier (will likely error later)
-		return &Ident{Name: name}, nil
+		return &ast.Ident{Name: name}, nil
 		
-	case TokIdent:
+	case lexer.TokIdent:
 		p.advance()
 		name := tok.Value
 		// Check for function call: ident(args)
-		if p.peek().Type == TokLParen {
+		if p.peek().Type == lexer.TokLParen {
 			return p.parseInfixCall(name)
 		}
 		// Check for array indexing: ident[expr]
-		if p.peek().Type == TokLBracket {
+		if p.peek().Type == lexer.TokLBracket {
 			p.advance() // consume [
 			index, err := p.parseInfixExpr()
 			if err != nil {
 				return nil, fmt.Errorf("line %d: error parsing index: %v", tok.Line, err)
 			}
-			if p.peek().Type != TokRBracket {
+			if p.peek().Type != lexer.TokRBracket {
 				return nil, fmt.Errorf("line %d: expected ']' after index", p.peek().Line)
 			}
 			p.advance() // consume ]
-			return &IndexExpr{Target: name, Index: index}, nil
+			return &ast.IndexExpr{Target: name, Index: index}, nil
 		}
-		return &Ident{Name: name}, nil
+		return &ast.Ident{Name: name}, nil
 		
-	case TokSelf:
+	case lexer.TokSelf:
 		p.advance()
 		// Can be followed by .member (Hash) or [index] (Indexed)
-		if p.peek().Type == TokDot {
+		if p.peek().Type == lexer.TokDot {
 			p.advance() // consume .
-			if p.peek().Type != TokIdent {
+			if p.peek().Type != lexer.TokIdent {
 				return nil, fmt.Errorf("line %d: expected member name after self.", p.peek().Line)
 			}
 			member := p.advance().Value
 			
 			// Check for chained index: self.prop[i]
-			if p.peek().Type == TokLBracket {
+			if p.peek().Type == lexer.TokLBracket {
 				p.advance() // consume [
 				index, err := p.parseInfixExpr()
 				if err != nil {
 					return nil, fmt.Errorf("line %d: error parsing index: %v", tok.Line, err)
 				}
-				if p.peek().Type != TokRBracket {
+				if p.peek().Type != lexer.TokRBracket {
 					return nil, fmt.Errorf("line %d: expected ']' after index", p.peek().Line)
 				}
 				p.advance() // consume ]
-				return &MemberIndexExpr{Target: "self", Member: member, Index: index}, nil
+				return &ast.MemberIndexExpr{Target: "self", Member: member, Index: index}, nil
 			}
 			
-			return &MemberExpr{Target: "self", Member: member}, nil
-		} else if p.peek().Type == TokLBracket {
+			return &ast.MemberExpr{Target: "self", Member: member}, nil
+		} else if p.peek().Type == lexer.TokLBracket {
 			p.advance() // consume [
 			index, err := p.parseInfixExpr()
 			if err != nil {
 				return nil, fmt.Errorf("line %d: error parsing index: %v", tok.Line, err)
 			}
-			if p.peek().Type != TokRBracket {
+			if p.peek().Type != lexer.TokRBracket {
 				return nil, fmt.Errorf("line %d: expected ']' after index", p.peek().Line)
 			}
 			p.advance() // consume ]
-			return &IndexExpr{Target: "self", Index: index}, nil
+			return &ast.IndexExpr{Target: "self", Index: index}, nil
 		} else {
 			return nil, fmt.Errorf("line %d: expected '.' or '[' after self", tok.Line)
 		}
 		
-	case TokLParen:
+	case lexer.TokLParen:
 		p.advance() // consume (
 		expr, err := p.parseInfixExpr()
 		if err != nil {
 			return nil, err
 		}
-		if p.peek().Type != TokRParen {
+		if p.peek().Type != lexer.TokRParen {
 			return nil, fmt.Errorf("line %d: expected ')' after expression", p.peek().Line)
 		}
 		p.advance() // consume )
@@ -2856,53 +2350,53 @@ func (p *Parser) parseInfixPrimary() (Expr, error) {
 	}
 }
 
-func (p *Parser) parseInfixCall(name string) (Expr, error) {
+func (p *Parser) parseInfixCall(name string) (ast.Expr, error) {
 	p.advance() // consume (
 	
-	var args []Expr
-	for p.peek().Type != TokRParen && p.peek().Type != TokEOF {
+	var args []ast.Expr
+	for p.peek().Type != lexer.TokRParen && p.peek().Type != lexer.TokEOF {
 		arg, err := p.parseInfixExpr()
 		if err != nil {
 			return nil, err
 		}
 		args = append(args, arg)
 		
-		if p.peek().Type == TokComma {
+		if p.peek().Type == lexer.TokComma {
 			p.advance()
 		}
 	}
 	
-	if p.peek().Type != TokRParen {
+	if p.peek().Type != lexer.TokRParen {
 		return nil, fmt.Errorf("line %d: expected ')' after function arguments", p.peek().Line)
 	}
 	p.advance() // consume )
 	
-	return &CallExpr{Fn: name, Args: args}, nil
+	return &ast.CallExpr{Fn: name, Args: args}, nil
 }
 
 // isTypeToken checks if token is a type name
-func isTypeToken(t TokenType) bool {
+func isTypeToken(t lexer.TokenType) bool {
 	switch t {
-	case TokI8, TokI16, TokI32, TokI64,
-	     TokU8, TokU16, TokU32, TokU64,
-	     TokF32, TokF64, TokString, TokBool, TokBytes:
+	case lexer.TokI8, lexer.TokI16, lexer.TokI32, lexer.TokI64,
+	     lexer.TokU8, lexer.TokU16, lexer.TokU32, lexer.TokU64,
+	     lexer.TokF32, lexer.TokF64, lexer.TokString, lexer.TokBool, lexer.TokBytes:
 		return true
 	}
 	return false
 }
 
 // name = expr or name: op(...)
-func (p *Parser) parseIdentStmt() (Stmt, error) {
+func (p *Parser) parseIdentStmt() (ast.Stmt, error) {
 	identTok := p.advance()
 	name := identTok.Value
 	
 	next := p.peek()
 	
-	if next.Type == TokEquals {
+	if next.Type == lexer.TokEquals {
 		p.advance() // consume =
 		
 		// Check for view.new(...)
-		if p.peek().Type == TokView {
+		if p.peek().Type == lexer.TokView {
 			return p.parseViewDecl(name)
 		}
 		
@@ -2911,22 +2405,22 @@ func (p *Parser) parseIdentStmt() (Stmt, error) {
 		if err != nil {
 			return nil, err
 		}
-		return &Assignment{Name: name, Expr: expr}, nil
+		return &ast.Assignment{Name: name, Expr: expr}, nil
 	}
 	
-	if next.Type == TokColon {
+	if next.Type == lexer.TokColon {
 		p.advance() // consume :
 		
 		// Check if this looks like a view op: name: op(...)
 		// View ops have: identifier or op keyword followed by (
 		// Function shorthand has: expression (number, identifier, etc.)
 		peek := p.peek()
-		if peek.Type == TokIdent || isOperationToken(peek.Type) {
+		if peek.Type == lexer.TokIdent || isOperationToken(peek.Type) {
 			// Look ahead to see if there's a ( after the identifier/keyword
 			// Save position for potential backtrack
 			savedPos := p.pos
 			p.advance() // consume identifier/keyword
-			if p.peek().Type == TokLParen {
+			if p.peek().Type == lexer.TokLParen {
 				// It's a view op pattern
 				p.pos = savedPos // backtrack
 				return p.parseViewOp(name)
@@ -2940,86 +2434,86 @@ func (p *Parser) parseIdentStmt() (Stmt, error) {
 		if err != nil {
 			return nil, err
 		}
-		return &FuncCall{Name: name, Args: []Expr{arg}}, nil
+		return &ast.FuncCall{Name: name, Args: []ast.Expr{arg}}, nil
 	}
 	
 	// Function call: name(args)
-	if next.Type == TokLParen {
+	if next.Type == lexer.TokLParen {
 		p.advance() // consume '('
 		
-		var args []Expr
-		for p.peek().Type != TokRParen && p.peek().Type != TokEOF {
+		var args []ast.Expr
+		for p.peek().Type != lexer.TokRParen && p.peek().Type != lexer.TokEOF {
 			arg, err := p.parseExpr()
 			if err != nil {
 				return nil, err
 			}
 			args = append(args, arg)
 			
-			if p.peek().Type == TokComma {
+			if p.peek().Type == lexer.TokComma {
 				p.advance()
 			}
 		}
 		
-		if p.peek().Type != TokRParen {
+		if p.peek().Type != lexer.TokRParen {
 			return nil, fmt.Errorf("line %d: expected ')' after function arguments", p.peek().Line)
 		}
 		p.advance() // consume ')'
 		
-		return &FuncCall{Name: name, Args: args}, nil
+		return &ast.FuncCall{Name: name, Args: args}, nil
 	}
 	
 	return nil, fmt.Errorf("line %d: expected = or : or ( after identifier", next.Line)
 }
 
-func (p *Parser) parseViewDecl(name string) (Stmt, error) {
-	_, err := p.expect(TokView)
+func (p *Parser) parseViewDecl(name string) (ast.Stmt, error) {
+	_, err := p.expect(lexer.TokView)
 	if err != nil {
 		return nil, err
 	}
 	
-	_, err = p.expect(TokDot)
+	_, err = p.expect(lexer.TokDot)
 	if err != nil {
 		return nil, err
 	}
 	
-	_, err = p.expect(TokNew)
+	_, err = p.expect(lexer.TokNew)
 	if err != nil {
 		return nil, err
 	}
 	
-	_, err = p.expect(TokLParen)
+	_, err = p.expect(lexer.TokLParen)
 	if err != nil {
 		return nil, err
 	}
 	
 	perspTok := p.advance()
 	
-	_, err = p.expect(TokRParen)
+	_, err = p.expect(lexer.TokRParen)
 	if err != nil {
 		return nil, err
 	}
 	
-	return &ViewDecl{Name: name, Perspective: perspTok.Value}, nil
+	return &ast.ViewDecl{Name: name, Perspective: perspTok.Value}, nil
 }
 
-func (p *Parser) parseViewOp(viewName string) (Stmt, error) {
+func (p *Parser) parseViewOp(viewName string) (ast.Stmt, error) {
 	opTok := p.advance()
 	op := opTok.Value
 	
-	_, err := p.expect(TokLParen)
+	_, err := p.expect(lexer.TokLParen)
 	if err != nil {
 		return nil, err
 	}
 	
-	var args []Expr
-	if p.peek().Type != TokRParen {
+	var args []ast.Expr
+	if p.peek().Type != lexer.TokRParen {
 		arg, err := p.parseExpr()
 		if err != nil {
 			return nil, err
 		}
 		args = append(args, arg)
 		
-		for p.peek().Type == TokComma {
+		for p.peek().Type == lexer.TokComma {
 			p.advance()
 			arg, err := p.parseExpr()
 			if err != nil {
@@ -3029,107 +2523,107 @@ func (p *Parser) parseViewOp(viewName string) (Stmt, error) {
 		}
 	}
 	
-	_, err = p.expect(TokRParen)
+	_, err = p.expect(lexer.TokRParen)
 	if err != nil {
 		return nil, err
 	}
 	
-	return &ViewOp{View: viewName, Op: op, Args: args}, nil
+	return &ast.ViewOp{View: viewName, Op: op, Args: args}, nil
 }
 
-func (p *Parser) parseExpr() (Expr, error) {
+func (p *Parser) parseExpr() (ast.Expr, error) {
 	return p.parseAdditive()
 }
 
-func (p *Parser) parseAdditive() (Expr, error) {
+func (p *Parser) parseAdditive() (ast.Expr, error) {
 	left, err := p.parseMultiplicative()
 	if err != nil {
 		return nil, err
 	}
 	
-	for p.peek().Type == TokPlus || p.peek().Type == TokMinus {
+	for p.peek().Type == lexer.TokPlus || p.peek().Type == lexer.TokMinus {
 		op := p.advance().Value
 		right, err := p.parseMultiplicative()
 		if err != nil {
 			return nil, err
 		}
-		left = &BinaryOp{Left: left, Op: op, Right: right}
+		left = &ast.BinaryOp{Left: left, Op: op, Right: right}
 	}
 	
 	return left, nil
 }
 
-func (p *Parser) parseMultiplicative() (Expr, error) {
+func (p *Parser) parseMultiplicative() (ast.Expr, error) {
 	left, err := p.parsePrimary()
 	if err != nil {
 		return nil, err
 	}
 	
-	for p.peek().Type == TokStar || p.peek().Type == TokSlash || p.peek().Type == TokPercent {
+	for p.peek().Type == lexer.TokStar || p.peek().Type == lexer.TokSlash || p.peek().Type == lexer.TokPercent {
 		op := p.advance().Value
 		right, err := p.parsePrimary()
 		if err != nil {
 			return nil, err
 		}
-		left = &BinaryOp{Left: left, Op: op, Right: right}
+		left = &ast.BinaryOp{Left: left, Op: op, Right: right}
 	}
 	
 	return left, nil
 }
 
-func (p *Parser) parsePrimary() (Expr, error) {
+func (p *Parser) parsePrimary() (ast.Expr, error) {
 	tok := p.peek()
 	
 	switch tok.Type {
-	case TokMinus:
+	case lexer.TokMinus:
 		// Unary minus for negative literals: push:-5, push:-3.14
 		p.advance()
 		operand, err := p.parsePrimary()
 		if err != nil {
 			return nil, err
 		}
-		return &UnaryExpr{Op: "-", Operand: operand}, nil
+		return &ast.UnaryExpr{Op: "-", Operand: operand}, nil
 		
-	case TokInt:
+	case lexer.TokInt:
 		p.advance()
 		var val int64
 		fmt.Sscanf(tok.Value, "%d", &val)
-		return &IntLit{Value: val}, nil
+		return &ast.IntLit{Value: val}, nil
 		
-	case TokFloat:
+	case lexer.TokFloat:
 		p.advance()
 		var val float64
 		fmt.Sscanf(tok.Value, "%f", &val)
-		return &FloatLit{Value: val}, nil
+		return &ast.FloatLit{Value: val}, nil
 		
-	case TokString:
+	case lexer.TokString:
 		p.advance()
-		return &StringLit{Value: tok.Value}, nil
+		return &ast.StringLit{Value: tok.Value}, nil
 		
-	case TokStackRef:
+	case lexer.TokStackRef:
 		p.advance()
 		name := tok.Value
 		
-		if p.peek().Type == TokColon {
+		if p.peek().Type == lexer.TokColon {
 			// @stack: op(...)
 			p.advance()
 			opTok := p.advance()
 			op := opTok.Value
 			
-			_, err := p.expect(TokLParen)
+			_, err := p.expect(lexer.TokLParen)
 			if err != nil {
 				return nil, err
 			}
 			
-			var args []Expr
-			if p.peek().Type != TokRParen {
+			var args []ast.Expr
+			if p.peek().Type != lexer.TokRParen {
 				arg, err := p.parseExpr()
 				if err != nil {
 					return nil, err
 				}
 				args = append(args, arg)
 				
-				for p.peek().Type == TokComma {
+				for p.peek().Type == lexer.TokComma {
 					p.advance()
 					arg, err := p.parseExpr()
 					if err != nil {
@@ -3139,44 +2633,44 @@ func (p *Parser) parsePrimary() (Expr, error) {
 				}
 			}
 			
-			_, err = p.expect(TokRParen)
+			_, err = p.expect(lexer.TokRParen)
 			if err != nil {
 				return nil, err
 			}
 			
-			return &StackExpr{Stack: name, Op: op, Args: args}, nil
+			return &ast.StackExpr{Stack: name, Op: op, Args: args}, nil
 		}
 		
-		return &StackRef{Name: name}, nil
+		return &ast.StackRef{Name: name}, nil
 		
-	case TokIdent:
+	case lexer.TokIdent:
 		p.advance()
 		name := tok.Value
 		
-		if p.peek().Type == TokColon {
+		if p.peek().Type == lexer.TokColon {
 			// Could be view: op(...) or func:arg (shorthand)
 			// Look ahead to determine which
 			p.advance() // consume ':'
 			
 			nextTok := p.peek()
-			if nextTok.Type == TokIdent || isOperationToken(nextTok.Type) {
+			if nextTok.Type == lexer.TokIdent || isOperationToken(nextTok.Type) {
 				// Check if followed by ( for view pattern
 				savedPos := p.pos
 				p.advance() // consume identifier/keyword
-				if p.peek().Type == TokLParen {
+				if p.peek().Type == lexer.TokLParen {
 					// It's view: op(...) pattern
 					op := nextTok.Value
 					p.advance() // consume '('
 					
-					var args []Expr
-					if p.peek().Type != TokRParen {
+					var args []ast.Expr
+					if p.peek().Type != lexer.TokRParen {
 						arg, err := p.parseExpr()
 						if err != nil {
 							return nil, err
 						}
 						args = append(args, arg)
 						
-						for p.peek().Type == TokComma {
+						for p.peek().Type == lexer.TokComma {
 							p.advance()
 							arg, err := p.parseExpr()
 							if err != nil {
@@ -3186,12 +2680,12 @@ func (p *Parser) parsePrimary() (Expr, error) {
 						}
 					}
 					
-					_, err := p.expect(TokRParen)
+					_, err := p.expect(lexer.TokRParen)
 					if err != nil {
 						return nil, err
 					}
 					
-					return &ViewExpr{View: name, Op: op, Args: args}, nil
+					return &ast.ViewExpr{View: name, Op: op, Args: args}, nil
 				}
 				// Not view pattern, backtrack
 				p.pos = savedPos
@@ -3202,22 +2696,22 @@ func (p *Parser) parsePrimary() (Expr, error) {
 			if err != nil {
 				return nil, err
 			}
-			return &FuncCall{Name: name, Args: []Expr{arg}}, nil
+			return &ast.FuncCall{Name: name, Args: []ast.Expr{arg}}, nil
 		}
 		
 		// Function call: name(args)
-		if p.peek().Type == TokLParen {
+		if p.peek().Type == lexer.TokLParen {
 			p.advance() // consume '('
 			
-			var args []Expr
-			if p.peek().Type != TokRParen {
+			var args []ast.Expr
+			if p.peek().Type != lexer.TokRParen {
 				arg, err := p.parseExpr()
 				if err != nil {
 					return nil, err
 				}
 				args = append(args, arg)
 				
-				for p.peek().Type == TokComma {
+				for p.peek().Type == lexer.TokComma {
 					p.advance()
 					arg, err := p.parseExpr()
 					if err != nil {
@@ -3227,36 +2721,36 @@ func (p *Parser) parsePrimary() (Expr, error) {
 				}
 			}
 			
-			_, err := p.expect(TokRParen)
+			_, err := p.expect(lexer.TokRParen)
 			if err != nil {
 				return nil, err
 			}
 			
-			return &FuncCall{Name: name, Args: args}, nil
+			return &ast.FuncCall{Name: name, Args: args}, nil
 		}
 		
-		return &Ident{Name: name}, nil
+		return &ast.Ident{Name: name}, nil
 		
-	case TokLIFO, TokFIFO, TokIndexed, TokHash:
+	case lexer.TokLIFO, lexer.TokFIFO, lexer.TokIndexed, lexer.TokHash:
 		p.advance()
-		return &PerspectiveLit{Value: tok.Value}, nil
+		return &ast.PerspectiveLit{Value: tok.Value}, nil
 		
-	case TokI8, TokI16, TokI32, TokI64, TokU8, TokU16, TokU32, TokU64,
-	     TokF32, TokF64, TokBool, TokStringType, TokBytes:
+	case lexer.TokI8, lexer.TokI16, lexer.TokI32, lexer.TokI64, lexer.TokU8, lexer.TokU16, lexer.TokU32, lexer.TokU64,
+	     lexer.TokF32, lexer.TokF64, lexer.TokBool, lexer.TokStringType, lexer.TokBytes:
 		p.advance()
-		return &TypeLit{Value: tok.Value}, nil
+		return &ast.TypeLit{Value: tok.Value}, nil
 		
-	case TokLBrace:
+	case lexer.TokLBrace:
 		// Codeblock (anonymous func): { body } or {|params| body }
 		return p.parseCodeblock()
 		
-	case TokLParen:
+	case lexer.TokLParen:
 		p.advance()
 		expr, err := p.parseExpr()
 		if err != nil {
 			return nil, err
 		}
-		_, err = p.expect(TokRParen)
+		_, err = p.expect(lexer.TokRParen)
 		if err != nil {
 			return nil, err
 		}
@@ -3269,8 +2763,8 @@ func (p *Parser) parsePrimary() (Expr, error) {
 
 // parseCodeblock: { body } or {|params| body }
 // Body can be a single expression (for map/filter/reduce) or statements (for @defer)
-func (p *Parser) parseCodeblock() (Expr, error) {
-	_, err := p.expect(TokLBrace)
+func (p *Parser) parseCodeblock() (ast.Expr, error) {
+	_, err := p.expect(lexer.TokLBrace)
 	if err != nil {
 		return nil, err
 	}
@@ -3278,19 +2772,19 @@ func (p *Parser) parseCodeblock() (Expr, error) {
 	var params []string
 	
 	// Check for |params| at start
-	// Handle empty params || (TokBarBar)
-	if p.peek().Type == TokBarBar {
+	// Handle empty params || (lexer.TokBarBar)
+	if p.peek().Type == lexer.TokBarBar {
 		p.advance() // consume ||
 		// params stays empty
-	} else if p.peek().Type == TokPipe {
+	} else if p.peek().Type == lexer.TokPipe {
 		p.advance() // consume opening |
 		
 		// Parse parameter list (skip if empty | |)
-		if p.peek().Type == TokIdent {
+		if p.peek().Type == lexer.TokIdent {
 			params = append(params, p.advance().Value)
-			for p.peek().Type == TokComma {
+			for p.peek().Type == lexer.TokComma {
 				p.advance() // consume ,
-				paramTok, err := p.expect(TokIdent)
+				paramTok, err := p.expect(lexer.TokIdent)
 				if err != nil {
 					return nil, err
 				}
@@ -3298,7 +2792,7 @@ func (p *Parser) parseCodeblock() (Expr, error) {
 			}
 		}
 		
-		_, err = p.expect(TokPipe)
+		_, err = p.expect(lexer.TokPipe)
 		if err != nil {
 			return nil, fmt.Errorf("line %d: expected '|' to close parameter list", p.peek().Line)
 		}
@@ -3315,17 +2809,17 @@ func (p *Parser) parseCodeblock() (Expr, error) {
 	p.skipNewlines()
 	
 	// If we got an expression and next is }, treat as expression body
-	if exprErr == nil && p.peek().Type == TokRBrace {
+	if exprErr == nil && p.peek().Type == lexer.TokRBrace {
 		p.advance() // consume }
-		return &FnLit{Params: params, Body: []Stmt{&ExprStmt{Expr: expr}}}, nil
+		return &ast.FnLit{Params: params, Body: []ast.Stmt{&ast.ExprStmt{Expr: expr}}}, nil
 	}
 	
 	// Backtrack and parse as statements
 	p.pos = startPos
 	p.skipNewlines()
 	
-	var body []Stmt
-	for p.peek().Type != TokRBrace && p.peek().Type != TokEOF {
+	var body []ast.Stmt
+	for p.peek().Type != lexer.TokRBrace && p.peek().Type != lexer.TokEOF {
 		stmt, err := p.parseStmt()
 		if err != nil {
 			return nil, err
@@ -3336,10 +2830,10 @@ func (p *Parser) parseCodeblock() (Expr, error) {
 		p.skipNewlines()
 	}
 	
-	_, err = p.expect(TokRBrace)
+	_, err = p.expect(lexer.TokRBrace)
 	if err != nil {
 		return nil, err
 	}
 	
-	return &FnLit{Params: params, Body: body}, nil
+	return &ast.FnLit{Params: params, Body: body}, nil
 }
