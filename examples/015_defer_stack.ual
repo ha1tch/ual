@@ -1,4 +1,4 @@
--- 15: @defer stack demonstration
+-- 015: @defer stack demonstration
 -- The @defer stack holds code blocks executed LIFO on scope exit
 
 -- Push cleanup blocks to @defer stack

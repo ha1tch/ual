@@ -1,4 +1,4 @@
--- 06: Map - Double each element
+-- 006: Map - Double each element
 
 @input = stack.new(i64)
 

@@ -1,0 +1,33 @@
+-- bench_concurrency_pipeline.ual
+-- Benchmark: Producer-consumer pipeline
+
+@queue = stack.new(i64)
+@queue perspective(FIFO)
+@done = stack.new(i64)
+@result = stack.new(i64)
+
+-- Producer: push 100 values
+@spawn < {
+    var i i64 = 0
+    while (i < 100) {
+        @queue < i
+        push:i inc let:i
+    }
+    @done < 1
+}
+
+-- Start producer
+@spawn pop play
+
+-- Wait for producer
+var d i64 = 0
+@done take:d
+
+-- Consumer: sum all values
+var sum i64 = 0
+@queue for{|v|
+    push:(sum + v) let:sum
+}
+
+-- Expected: 0+1+...+99 = 4950
+push:sum dot

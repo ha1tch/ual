@@ -57,4 +57,4 @@
 @out = stack.new(i64)
 @out push(1)
 @out pop
-print
+dot

@@ -1,0 +1,53 @@
+{
+  "version": "0.7.4",
+  "date": "2025-12-16",
+  "notes": "Initial baseline - Go and iual backends",
+  "environment": {
+    "os": "linux",
+    "arch": "amd64",
+    "go_version": "1.22.2"
+  },
+  "iterations": 5,
+  "benchmarks": {
+    "bench_compute_leibniz": {
+      "go_ms": 14,
+      "rust_ms": 10,
+      "iual_ms": 720
+    },
+    "bench_compute_mandelbrot": {
+      "go_ms": 13,
+      "rust_ms": 12,
+      "iual_ms": 96
+    },
+    "bench_compute_newton": {
+      "go_ms": 12,
+      "rust_ms": 10,
+      "iual_ms": 25
+    },
+    "bench_concurrency_pipeline": {
+      "go_ms": 12,
+      "rust_ms": 11,
+      "iual_ms": 14
+    },
+    "bench_concurrency_spawn": {
+      "go_ms": 13,
+      "rust_ms": 12,
+      "iual_ms": 13
+    },
+    "bench_memory_large_stack": {
+      "go_ms": 20,
+      "rust_ms": 15,
+      "iual_ms": 32
+    },
+    "bench_stack_push_pop": {
+      "go_ms": 19,
+      "rust_ms": 14,
+      "iual_ms": 33
+    }
+  },
+  "binary_sizes": {
+    "go_stripped": 1265816,
+    "rust_stripped": 379000,
+    "iual": 2861731
+  }
+}

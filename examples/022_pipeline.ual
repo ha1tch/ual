@@ -1,4 +1,4 @@
--- 22: Pipeline - Producer -> Transformer -> Consumer
+-- 022: Pipeline - Producer -> Transformer -> Consumer
 -- Demonstrates concurrent pipeline with FIFO queues
 
 @raw = stack.new(i64)

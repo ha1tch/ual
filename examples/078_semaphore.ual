@@ -1,0 +1,73 @@
+-- 078: Semaphore Pattern
+-- Limit concurrent access using a counting semaphore
+
+@semaphore = stack.new(i64)
+@results = stack.new(i64)
+@done = stack.new(i64)
+
+-- Initialize semaphore with 2 permits
+@semaphore < 1
+@semaphore < 1
+
+-- Worker function: acquire permit, do work, release permit
+-- Worker 1
+@spawn < {
+    var permit i64 = 0
+    @semaphore take:permit  -- acquire
+    @results < 10
+    @semaphore < 1          -- release
+    @done < 1
+}
+
+-- Worker 2
+@spawn < {
+    var permit i64 = 0
+    @semaphore take:permit
+    @results < 20
+    @semaphore < 1
+    @done < 1
+}
+
+-- Worker 3
+@spawn < {
+    var permit i64 = 0
+    @semaphore take:permit
+    @results < 30
+    @semaphore < 1
+    @done < 1
+}
+
+-- Worker 4
+@spawn < {
+    var permit i64 = 0
+    @semaphore take:permit
+    @results < 40
+    @semaphore < 1
+    @done < 1
+}
+
+-- Start all workers
+@spawn pop play pop play pop play pop play
+
+-- Wait for all workers
+var d1 i64 = 0
+var d2 i64 = 0
+var d3 i64 = 0
+var d4 i64 = 0
+@done take:d1
+@done take:d2
+@done take:d3
+@done take:d4
+
+-- Collect results
+var r1 i64 = 0
+var r2 i64 = 0
+var r3 i64 = 0
+var r4 i64 = 0
+@results take:r1
+@results take:r2
+@results take:r3
+@results take:r4
+
+-- Expected: 10 + 20 + 30 + 40 = 100
+push:(r1 + r2 + r3 + r4) dot

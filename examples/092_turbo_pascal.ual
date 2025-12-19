@@ -1,0 +1,252 @@
+-- 093: Turbo Pascal IDE - Improved
+-- More authentic recreation using Unicode box-drawing characters
+-- Closer to the real Turbo Pascal 7.0 look
+
+-- ============================================
+-- GRAPHICS PRIMITIVES
+-- ============================================
+
+func ink(color i64) {
+    print("\e[38;5;")
+    print:color
+    print("m")
+}
+
+func paper(color i64) {
+    print("\e[48;5;")
+    print:color
+    print("m")
+}
+
+func gotoxy(x i64, y i64) {
+    print("\e[")
+    print:y
+    print(";")
+    print:x
+    print("H")
+}
+
+func cls() {
+    print("\e[2J\e[1;1H")
+}
+
+func normvideo() {
+    print("\e[0m")
+}
+
+func bar(x1 i64, y1 i64, x2 i64, y2 i64) {
+    var y i64 = y1
+    while (y <= y2) {
+        gotoxy(x1, y)
+        var x i64 = x1
+        while (x <= x2) {
+            print(" ")
+            push:(x + 1) let:x
+        }
+        push:(y + 1) let:y
+    }
+}
+
+-- Double-line box (Unicode)
+func doublebox(x1 i64, y1 i64, x2 i64, y2 i64) {
+    -- Top edge
+    gotoxy(x1, y1)
+    print("╔")
+    var x i64 = 0
+    push:(x1 + 1) let:x
+    while (x < x2) {
+        print("═")
+        push:(x + 1) let:x
+    }
+    print("╗")
+    
+    -- Sides
+    var y i64 = 0
+    push:(y1 + 1) let:y
+    while (y < y2) {
+        gotoxy(x1, y)
+        print("║")
+        gotoxy(x2, y)
+        print("║")
+        push:(y + 1) let:y
+    }
+    
+    -- Bottom edge
+    gotoxy(x1, y2)
+    print("╚")
+    push:(x1 + 1) let:x
+    while (x < x2) {
+        print("═")
+        push:(x + 1) let:x
+    }
+    print("╝")
+}
+
+-- ============================================
+-- TURBO PASCAL 7.0 IDE
+-- ============================================
+
+-- Colors matching real TP7
+var blue i64 = 20         -- Dark blue background
+var cyan i64 = 37         -- Cyan for menu/status
+var white i64 = 15        -- Bright white
+var yellow i64 = 226      -- Yellow for keywords
+var black i64 = 0         -- Black
+var red i64 = 196         -- Red for highlights
+var silver i64 = 250      -- Silver/light gray for status bar
+var green i64 = 34        -- Green for close button
+
+-- Screen dimensions
+var scrW i64 = 80
+var scrH i64 = 25
+
+-- Clear and set up
+cls()
+
+-- Fill entire screen with blue
+paper(blue)
+bar(1, 1, scrW, scrH)
+
+-- Menu bar (cyan background, black text)
+paper(cyan)
+ink(black)
+bar(1, 1, scrW, 1)
+gotoxy(3, 1)
+print("File  Edit  Search  Run  Compile  Debug  Tools  Options  Window  Help")
+
+-- Highlight File menu item (white on red)
+gotoxy(2, 1)
+paper(red)
+ink(white)
+print(" File ")
+
+-- Main edit window with double-line border
+paper(blue)
+ink(cyan)
+doublebox(1, 2, scrW, scrH - 2)
+
+-- Window title bar - close button
+gotoxy(3, 2)
+print("[")
+ink(green)
+print("■")
+ink(cyan)
+print("]")
+
+-- Filename centered in top border (bright white)
+gotoxy(32, 2)
+ink(white)
+print(" NONAME.PAS ")
+ink(cyan)
+
+-- Window number on right
+gotoxy(76, 2)
+print("1")
+
+-- Scroll indicator top right
+gotoxy(scrW, 3)
+ink(cyan)
+print("▲")
+
+-- Scroll bar
+var sy i64 = 4
+while (sy < scrH - 3) {
+    gotoxy(scrW, sy)
+    print("░")
+    push:(sy + 1) let:sy
+}
+
+-- Scroll indicator bottom
+gotoxy(scrW, scrH - 3)
+print("▼")
+
+-- Edit area content (white text, yellow keywords)
+-- Line 1: program Hello;
+gotoxy(2, 4)
+ink(yellow)
+print("program")
+ink(white)
+print(" Hello;")
+
+-- Line 2: var
+gotoxy(2, 5)
+ink(yellow)
+print("var")
+
+-- Line 3: i: Integer;
+gotoxy(4, 6)
+ink(white)
+print("i: ")
+ink(yellow)
+print("Integer")
+ink(white)
+print(";")
+
+-- Line 4: begin
+gotoxy(2, 7)
+ink(yellow)
+print("begin")
+
+-- Line 5: WriteLn(...);
+gotoxy(4, 8)
+ink(white)
+print("WriteLn('Hello from ual!');")
+
+-- Line 6: WriteLn(...);
+gotoxy(4, 9)
+print("WriteLn('Turbo Pascal 7.0 style');")
+
+-- Line 7: ReadLn(i);
+gotoxy(4, 10)
+print("ReadLn(i);")
+
+-- Line 8: end.
+gotoxy(2, 11)
+ink(yellow)
+print("end")
+ink(white)
+print(".")
+
+-- Status line (black on silver)
+paper(silver)
+ink(black)
+bar(1, scrH - 1, scrW, scrH - 1)
+gotoxy(2, scrH - 1)
+print(" *  ")
+
+-- Time display
+gotoxy(6, scrH - 1)
+print("5:39")
+
+-- Horizontal scroll indicator
+gotoxy(14, scrH - 1)
+print("◄")
+gotoxy(15, scrH - 1)
+ink(blue)
+print("░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░")
+gotoxy(79, scrH - 1)
+ink(black)
+print("►")
+
+-- Scroll position marker
+gotoxy(16, scrH - 1)
+paper(black)
+ink(silver)
+print(" ")
+paper(silver)
+
+-- Bottom help line (black on silver, F1 in red)
+paper(silver)
+ink(black)
+bar(1, scrH, scrW, scrH)
+gotoxy(2, scrH)
+ink(red)
+print("F1")
+ink(black)
+print(" Help │ Welcome to Turbo Pascal. Not really! ual can only hope to get turbo!")
+
+-- Reset for clean exit
+normvideo()
+gotoxy(1, scrH + 1)
+println("")
+println("Turbo Pascal 7.0 IDE - ual would like to acknowledge.")

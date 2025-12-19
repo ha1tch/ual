@@ -5,14 +5,14 @@
 push:10
 push:20
 push:30
-print       -- prints 30 (peek, non-destructive)
+dup dot     -- prints 30 (dup to preserve, dot to pop copy)
 dot         -- prints 30 and pops
 dot         -- prints 20 and pops
 
 -- Explicit @dstack usage (same thing)
 @dstack push:100
 @dstack push:200
-@dstack: print()
+@dstack dot
 
 -- Return stack operations
 push:42
@@ -23,4 +23,4 @@ dot         -- prints 42
 dot         -- prints 99
 
 -- Calculate something
-push:5 push:3 add print  -- prints 8
+push:5 push:3 add dot  -- prints 8

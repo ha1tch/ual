@@ -1,0 +1,2 @@
+-- Runtime error test: undefined variable
+print(undefined_var)

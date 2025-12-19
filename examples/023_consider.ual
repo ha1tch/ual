@@ -8,8 +8,8 @@
     add
     dot
 }.consider(
-    ok: print("Operation succeeded")
-    error |e|: print("Error: " + e)
+    ok: println("Operation succeeded")
+    error |e|: println("Error: " + e)
 )
 
 -- Using explicit status:label to set outcome
@@ -26,12 +26,12 @@ func divide(a i64, b i64) i64 {
     push:result
 }.consider(
     ok: {
-        print("Division result:")
+        println("Division result:")
         dot
     }
     error |msg|: {
-        print("Division failed:")
-        print(msg)
+        println("Division failed:")
+        println(msg)
     }
 )
 
@@ -57,10 +57,10 @@ func validate_age(age i64) i64 {
     var age i64 = validate_age(15)
     push:age
 }.consider(
-    ok: print("Valid adult age")
-    minor |age|: print("Minor detected")
-    invalid |reason|: print("Invalid: " + reason)
-    _: print("Unknown status")
+    ok: println("Valid adult age")
+    minor |age|: println("Minor detected")
+    invalid |reason|: println("Invalid: " + reason)
+    _: println("Unknown status")
 )
 
 -- Nested consider blocks
@@ -71,15 +71,15 @@ func validate_age(age i64) i64 {
         push:50
         status:partial
     }.consider(
-        ok: print("Inner ok")
-        partial: print("Inner partial")
-        _: print("Inner unknown")
+        ok: println("Inner ok")
+        partial: println("Inner partial")
+        _: println("Inner unknown")
     )
     
     dot
 }.consider(
-    ok: print("Outer completed")
-    _: print("Outer issue")
+    ok: println("Outer completed")
+    _: println("Outer issue")
 )
 
-print("Consider examples complete")
+println("Consider examples complete")

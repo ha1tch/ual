@@ -1,0 +1,42 @@
+-- 076: Work Queue with Poison Pill
+-- Worker processes items until it sees sentinel value (0)
+
+@tasks = stack.new(i64)
+@tasks perspective(FIFO)
+
+@results = stack.new(i64)
+@done = stack.new(i64)
+
+-- Worker: process tasks until zero
+@spawn < {
+    var sum i64 = 0
+    var task i64 = 1
+    @tasks take:task
+    while (task != 0) {
+        push:(sum + task) let:sum
+        @tasks take:task
+    }
+    @results < sum
+    @done < 1
+}
+
+-- Start worker
+@spawn pop play
+
+-- Queue up some tasks
+@tasks < 10
+@tasks < 20
+@tasks < 30
+@tasks < 40
+@tasks < 0  -- poison pill (sentinel)
+
+-- Wait for worker
+var d i64 = 0
+@done take:d
+
+-- Get result
+var total i64 = 0
+@results take:total
+
+-- Expected: 10 + 20 + 30 + 40 = 100
+push:total dot

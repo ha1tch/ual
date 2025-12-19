@@ -1,4 +1,4 @@
--- 04: Linear Search - Find value in stack (1000 elements)
+-- 004: Linear Search - Find value in stack (1000 elements)
 
 @haystack = stack.new(i64)
 

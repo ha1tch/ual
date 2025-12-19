@@ -2,6 +2,177 @@
 
 All notable changes to ual will be documented in this file.
 
+## [0.7.4] - 2025-12-18
+
+### Highlights
+
+**Rust Backend — Production Ready**
+
+ual now compiles to Rust in addition to Go:
+
+```bash
+ual compile --target rust program.ual    # Generate program.rs
+ual build --target rust program.ual      # Build Rust binary
+```
+
+Full feature parity with the Go backend across all 92 examples. The Rust backend produces smaller binaries (343KB vs 1.3MB stripped) and equivalent performance.
+
+**Threaded Code Compiler for iual**
+
+The interpreter now compiles compute blocks to threaded code, delivering 5–12× speedup over tree-walking interpretation:
+
+| Benchmark | Speedup |
+|-----------|---------|
+| Leibniz π (1M) | **11.2×** |
+| Mandelbrot 50×50 | **5.1×** |
+| Newton sqrt ×1000 | **1.9×** |
+
+iual now beats Python by 4–13× on numeric workloads.
+
+**Three-Way Parity**
+
+All three execution modes produce identical output for all 92 examples:
+
+| Mode | Status |
+|------|--------|
+| Go backend | 92/92 ✓ |
+| Rust backend | 92/92 ✓ |
+| iual interpreter | 92/92 ✓ |
+
+---
+
+### Added
+
+**Automatic Target Selection**
+
+When no `--target` is specified, the compiler automatically selects the best available backend:
+
+| Target specified | Go ≥1.22 | Rust ≥1.75 | Action |
+|------------------|----------|------------|--------|
+| none | ✓ | ✓ | use Go |
+| none | ✓ | ✗ | use Go |
+| none | ✗ | ✓ | use Rust |
+| none | ✗ | ✗ | fail |
+| `--target go` | ✓ | — | use Go |
+| `--target go` | ✗ | — | fail |
+| `--target rust` | — | ✓ | use Rust |
+| `--target rust` | — | ✗ | fail |
+
+This allows ual to work in environments with only one toolchain installed.
+
+**Build Profile Options**
+
+New flags for `ual build` to control binary optimisation:
+
+| Flag | Effect |
+|------|--------|
+| `--release` | Standard release build (default) |
+| `--small` | Size-optimised (smallest binary) |
+| `--build-debug` | Debug build with symbols |
+| `--strip` | Strip symbols from binary |
+
+```bash
+ual build program.ual                       # Default release
+ual build --small program.ual               # Smallest binary
+ual build --strip program.ual               # Release + stripped
+ual build --small --target rust program.ual # Small Rust binary (~343K)
+```
+
+Binary size comparison (001_fibonacci):
+
+| Build | Go | Rust |
+|-------|-----|------|
+| Default | 1.9M | 13M (debug symbols) |
+| Stripped | 1.3M | 403K |
+| Small (full opts) | 1.3M | 343K |
+
+Rust with `--small` produces binaries ~4x smaller than Go.
+
+**Rust Backend Test Suite**
+
+New `test_rust_backend.sh` script for comprehensive Rust backend testing:
+
+```bash
+./test_rust_backend.sh
+```
+
+Features:
+- Detects Rust toolchain (requires 1.75+)
+- Compiles all examples with both Go and Rust backends
+- Compares output for equivalence
+- Reports pass/fail/skip statistics
+
+### Changed
+
+**Example Numbering**
+
+Examples renumbered to use contiguous numbering (001-092):
+
+- 001-022: Core language features (stacks, spawn, take, pipeline)
+- 023-030: Consider construct (error handling, status matching)
+- 031-033: Select construct (multi-stack waiting)
+- 034-051: Compute blocks (arithmetic, algorithms, arrays)
+- 052-058: Stack operations (bring, freeze, hash, view, return stack, Forth ops)
+- 059-071: Algorithms, benchmarks, control flow, syntax
+- 072-079: Concurrency patterns (multi-producer, fan-out, barrier, ping-pong, work queue, mapreduce, semaphore, bounded buffer)
+- 080-085: Advanced concurrency (I/O ops, pipeline stages, competing workers, load balancer, graceful shutdown, resource pool)
+- 086-089: Local stacks and parallel patterns (spawn-local stacks, compute in spawn, parallel reduction)
+- 090-092: Terminal graphics demos (terminal paint, flag circle, Turbo Pascal IDE)
+
+**Build Command Supports Rust Target**
+
+The `ual build` command now supports `--target rust`:
+
+```bash
+ual build --target rust examples/001_fibonacci.ual
+```
+
+This generates a temporary Cargo project, builds with the appropriate profile, and copies the resulting binary to the output location.
+
+### Fixed
+
+**Consider Block Error Bindings (Go and Rust backends)**
+
+When a `status:error("message")` set a string error value and the handler used `print(msg)`, the compiled code incorrectly printed the integer binding (0) instead of the string message. Fixed by tracking consider bindings and using the `_str` version for print operations.
+
+```ual
+func divide(a i64, b i64) i64 {
+    if (b == 0) {
+        status:error("division by zero")
+        return 0
+    }
+    return a / b
+}
+
+@dstack {
+    var result i64 = divide(100, 0)
+}.consider(
+    error |msg|: {
+        print(msg)  -- Now correctly prints "division by zero"
+    }
+)
+```
+
+**Blocking Select in Interpreter (iual)**
+
+The interpreter's `select` implementation did not properly block waiting for data. It checked each stack once and returned immediately, causing spawned tasks to miss their values. Fixed by implementing proper blocking loop with timeout support.
+
+```ual
+@spawn < { @inbox: push(42) }
+@spawn pop play
+
+@dstack {}.select(
+    @inbox {|msg| push:msg dot }  -- Now correctly waits and receives 42
+)
+```
+
+**Rust Codegen Improvements**
+
+- Added `STACK_ERROR` to lazy_static block for `@error` operations
+- Added duplicate stack declaration detection (prevents redeclaration errors)
+- Fixed `else if` brace escaping (was generating `}} else if ... {{`)
+- Added `reduce` expression support for stack operations
+
 ## [0.7.3] - 2025-12-12
 
 ### Fixed
@@ -20,7 +191,7 @@ if (@data: len() > 0) {         -- works in conditionals
 }
 ```
 
-Previously, `len()` returned Go's `int` type, causing type mismatches in UAL expressions.
+Previously, `len()` returned Go's `int` type, causing type mismatches in ual expressions.
 
 **clear() Operation**
 
@@ -131,7 +302,7 @@ This update completes Phase 1 and Phase 2 of runtime unification, bringing the i
 
 **Interpreter (iual)**
 
-The UAL interpreter is now a first-class tool with full feature parity:
+The ual interpreter is now a first-class tool with full feature parity:
 
 ```bash
 iual examples/001_fibonacci.ual       # Run with interpreter
@@ -1157,6 +1328,8 @@ Work-stealing comparison (1 owner + 3 thieves):
 
 | Version | Date | Highlights |
 |---------|------|------------|
+| 0.7.4 | 2025-12-18 | Rust backend (100% parity), build profiles (--small, --strip), 92 examples, three-way equivalence, threaded code compiler for iual |
+| 0.7.3 | 2025-12-12 | len() fix, clear() fix, runtime unification, interpreter parity |
 | 0.7.2 | 2025-12-11 | Negative literals, compile-time type checking, CLI verbosity controls, Makefile |
 | 0.7.1 | 2025-12-10 | Cross-language benchmarks (C, Go, ual, Python), benchmark suite reorganisation |
 | 0.7.0 | 2025-12-10 | Compute construct (.compute), self.property, self[i], set/get, local arrays, container array views |

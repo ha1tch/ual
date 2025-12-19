@@ -44,6 +44,7 @@ const (
 	// Variable declarations
 	TokVar
 	TokLet
+	TokLocal // for spawn-local stacks
 	// Control flow
 	TokIf
 	TokElseIf
@@ -122,6 +123,8 @@ const (
 	TokRot
 	// I/O
 	TokPrint
+	TokPrintln
+	TokEmit
 	TokDotOp  // dot operation (pop and print)
 	// Return stack
 	TokToR    // >r - move to return stack
@@ -267,6 +270,7 @@ var Keywords = map[string]TokenType{
 	// Variable declarations
 	"var":         TokVar,
 	"let":         TokLet,
+	"local":       TokLocal,
 	// Control flow
 	"if":          TokIf,
 	"elseif":      TokElseIf,
@@ -334,6 +338,8 @@ var Keywords = map[string]TokenType{
 	"rot":         TokRot,
 	// I/O
 	"print":       TokPrint,
+	"println":     TokPrintln,
+	"emit":        TokEmit,
 	"dot":         TokDotOp,
 	// Return stack
 	"tor":         TokToR,
@@ -486,10 +492,30 @@ func (l *Lexer) readString() Token {
 				sb.WriteByte('\t')
 			case 'r':
 				sb.WriteByte('\r')
+			case 'e':
+				sb.WriteByte(0x1b) // ESC character
 			case '"':
 				sb.WriteByte('"')
 			case '\\':
 				sb.WriteByte('\\')
+			case 'x':
+				// Hex escape: \xNN
+				if l.peek() != 0 && l.peekAhead(1) != 0 {
+					h1 := l.advance()
+					h2 := l.advance()
+					val := hexDigit(h1)*16 + hexDigit(h2)
+					sb.WriteByte(val)
+				}
+			case '0':
+				// Octal escape: \0NN or just \0
+				if isDigit(l.peek()) && isDigit(l.peekAhead(1)) {
+					o1 := l.advance() - '0'
+					o2 := l.advance() - '0'
+					val := o1*8 + o2
+					sb.WriteByte(val)
+				} else {
+					sb.WriteByte(0) // null
+				}
 			default:
 				sb.WriteByte(escaped)
 			}
@@ -697,4 +723,23 @@ func (l *Lexer) Tokenize() []Token {
 		}
 	}
 	return tokens
+}
+
+// isDigit returns true if ch is a decimal digit.
+func isDigit(ch byte) bool {
+	return ch >= '0' && ch <= '9'
+}
+
+// hexDigit returns the numeric value of a hex digit (0-15).
+func hexDigit(ch byte) byte {
+	switch {
+	case ch >= '0' && ch <= '9':
+		return ch - '0'
+	case ch >= 'a' && ch <= 'f':
+		return ch - 'a' + 10
+	case ch >= 'A' && ch <= 'F':
+		return ch - 'A' + 10
+	default:
+		return 0
+	}
 }

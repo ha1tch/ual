@@ -1,0 +1,12 @@
+-- Runtime error test: array index out of bounds
+@stack = stack.new(f64)
+@stack push(1.0)
+
+@stack {
+}.compute({|x|
+    var arr[10]
+    arr[0] = 1.0
+    return arr[100]  -- out of bounds
+})
+
+@stack dot

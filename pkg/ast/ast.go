@@ -28,11 +28,13 @@ type Program struct {
 func (p *Program) node() {}
 
 // StackDecl: @name = stack.new(type, cap: n)
+// or: local @name = stack.new(type) inside spawn blocks
 type StackDecl struct {
 	Name        string
 	ElementType string
 	Perspective string // optional, defaults to LIFO
 	Capacity    int    // 0 = unlimited
+	Local       bool   // true for spawn-local stacks
 }
 
 func (s *StackDecl) node() {}
@@ -58,10 +60,11 @@ func (a *Assignment) stmt() {}
 
 // StackOp: @stack: operation(args...)
 type StackOp struct {
-	Stack  string
-	Op     string
-	Args   []Expr
-	Target string // for pop:var, take:var — direct assignment to variable
+	Stack     string
+	Op        string
+	Args      []Expr
+	Target    string // for pop:var, take:var — direct assignment to variable
+	ColonForm bool   // true if op:arg form, false if op(arg) form
 }
 
 func (s *StackOp) node() {}

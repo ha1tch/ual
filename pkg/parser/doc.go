@@ -1,7 +1,7 @@
-// Package parser provides parsing for UAL source code.
+// Package parser provides parsing for ual source code.
 //
 // The parser consumes tokens from the lexer and produces an Abstract Syntax Tree (AST).
-// It implements a recursive descent parser that handles UAL's grammar including:
+// It implements a recursive descent parser that handles ual's grammar including:
 //   - Stack and view declarations
 //   - Function definitions with parameters and return types
 //   - Stack operations and blocks

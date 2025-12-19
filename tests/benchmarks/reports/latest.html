@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ual Benchmark Report</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * { box-sizing: border-box; }
+        
+        /* Light mode (default) */
+        :root {
+            --bg-primary: #f5f5f5;
+            --bg-card: white;
+            --text-primary: #333;
+            --text-secondary: #666;
+            --text-muted: #888;
+            --border-color: #eee;
+            --border-strong: #ddd;
+            --accent-blue: #0066cc;
+            --accent-green: #00aa00;
+            --accent-orange: #cc6600;
+            --hover-bg: #f9f9f9;
+            --shadow: rgba(0,0,0,0.1);
+            --link-color: #666;
+        }
+        
+        /* Dark mode */
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --bg-primary: #1a1a1a;
+                --bg-card: #2a2a2a;
+                --text-primary: #e0e0e0;
+                --text-secondary: #aaa;
+                --text-muted: #888;
+                --border-color: #3a3a3a;
+                --border-strong: #4a4a4a;
+                --accent-blue: #4da6ff;
+                --accent-green: #00cc00;
+                --accent-orange: #ff9933;
+                --hover-bg: #333;
+                --shadow: rgba(0,0,0,0.3);
+                --link-color: #aaa;
+            }
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 0; padding: 2rem;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+        }
+        .container { max-width: 1400px; margin: 0 auto; }
+        header { margin-bottom: 2rem; }
+        h1 { color: var(--text-primary); margin: 0 0 0.5rem 0; }
+        .subtitle { color: var(--text-secondary); font-size: 0.9rem; }
+        .summary {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 1rem; margin-bottom: 2rem;
+        }
+        .metric-card {
+            background: var(--bg-card); border-radius: 8px; padding: 1.5rem;
+            text-align: center; box-shadow: 0 1px 3px var(--shadow);
+        }
+        .metric-value { font-size: 2.2rem; font-weight: bold; color: var(--accent-blue); }
+        .metric-value.warning { color: var(--accent-orange); }
+        .metric-value.success { color: var(--accent-green); }
+        .metric-label { color: var(--text-secondary); font-size: 0.85rem; margin-top: 0.5rem; }
+        .dashboard {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(450px, 1fr));
+            gap: 1.5rem; margin-bottom: 2rem;
+        }
+        .card {
+            background: var(--bg-card); border-radius: 8px; padding: 1.5rem;
+            box-shadow: 0 1px 3px var(--shadow);
+        }
+        .card h2 { margin: 0 0 1rem 0; font-size: 1.1rem; color: var(--text-secondary); }
+        .chart-container { position: relative; height: 280px; }
+        table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+        th, td { padding: 0.6rem; text-align: left; border-bottom: 1px solid var(--border-color); }
+        th { font-weight: 600; color: var(--text-secondary); }
+        tr:hover { background: var(--hover-bg); }
+        .num { text-align: right; font-family: 'SF Mono', Monaco, Consolas, monospace; }
+        .num.success { color: var(--accent-green); font-weight: 600; }
+        .num.warning { color: var(--accent-orange); }
+        .note { color: var(--text-muted); font-size: 0.8rem; margin-top: 1rem; }
+        footer {
+            margin-top: 2rem; padding-top: 1rem; border-top: 1px solid var(--border-strong);
+            color: var(--text-muted); font-size: 0.85rem;
+        }
+        footer a { color: var(--link-color); }
+        
+        /* Analysis section styling */
+        .analysis-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 2.5rem 1.5rem;  /* row-gap column-gap */
+            margin-bottom: 2rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>ual Benchmark Report</h1>
+            <div class="subtitle">
+                Generated: 2025-12-19T08:59:26-03:00 | Version: 0.7.4
+            </div>
+        </header>
+        
+        <div class="summary">
+            <div class="metric-card">
+                <div class="metric-value success">92/92</div>
+                <div class="metric-label">Examples Passing</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-value">1.06x</div>
+                <div class="metric-label">Go / Rust</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-value success">1.8x</div>
+                <div class="metric-label">iual / Compiled</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-value">1568KB</div>
+                <div class="metric-label">Go Binary (stripped)</div>
+            </div>
+        </div>
+        
+        <div class="dashboard">
+            <div class="card">
+                <h2>Backend Execution Time</h2>
+                <div class="chart-container">
+                    <canvas id="backendChart"></canvas>
+                </div>
+            </div>
+            
+            <div class="card">
+                <h2>Binary Size Comparison (stripped)</h2>
+                <div class="chart-container">
+                    <canvas id="sizeChart"></canvas>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card">
+            <h2>ual Backend Results</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Benchmark</th>
+                        <th class="num">Go (ms)</th>
+                        <th class="num">Rust (ms)</th>
+                        <th class="num">iual (ms)</th>
+                        <th class="num">iual/Go</th>
+                    </tr>
+                </thead>
+                <tbody>
+<tr>
+            <td>Compute Leibniz</td>
+            <td class="num">12</td>
+            <td class="num">11</td>
+            <td class="num">38</td>
+            <td class="num ">3.2x</td>
+        </tr>
+<tr>
+            <td>Compute Mandelbrot</td>
+            <td class="num">11</td>
+            <td class="num">10</td>
+            <td class="num">12</td>
+            <td class="num success">1.1x</td>
+        </tr>
+<tr>
+            <td>Compute Newton</td>
+            <td class="num">10</td>
+            <td class="num">10</td>
+            <td class="num">9</td>
+            <td class="num success">0.9x</td>
+        </tr>
+
+                </tbody>
+            </table>
+            <p class="note">iual uses threaded code compilation for compute blocks</p>
+        </div>
+        
+
+        <div class="card">
+            <h2>Cross-Language Comparison</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Benchmark</th>
+                        <th class="num">C (ms)</th>
+                        <th class="num">Rust (ms)</th>
+                        <th class="num">Python (ms)</th>
+                        <th class="num">ual-Go (ms)</th>
+                        <th class="num">iual (ms)</th>
+                    </tr>
+                </thead>
+                <tbody>
+<tr>
+                        <td>Leibniz</td>
+                        <td class="num">10</td>
+                        <td class="num">10</td>
+                        <td class="num">238</td>
+                        <td class="num">12</td>
+                        <td class="num">38</td>
+                    </tr>
+<tr>
+                        <td>Mandelbrot</td>
+                        <td class="num">8</td>
+                        <td class="num">8</td>
+                        <td class="num">198</td>
+                        <td class="num">11</td>
+                        <td class="num">12</td>
+                    </tr>
+<tr>
+                        <td>Newton</td>
+                        <td class="num">8</td>
+                        <td class="num">8</td>
+                        <td class="num">192</td>
+                        <td class="num">10</td>
+                        <td class="num">9</td>
+                    </tr>
+
+                </tbody>
+            </table>
+            <p class="note">C compiled with -O2, Rust with --release, Python 3.x interpreted</p>
+        </div>
+
+
+        <div class="analysis-grid">
+
+        <div class="card">
+            <h2>Analysis: Compiled ual vs C</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Benchmark</th>
+                        <th class="num">C (ms)</th>
+                        <th class="num">ual-Go (ms)</th>
+                        <th class="num">ual-Go / C</th>
+                        <th class="num">ual-Rust (ms)</th>
+                        <th class="num">ual-Rust / C</th>
+                    </tr>
+                </thead>
+                <tbody>
+<tr>
+                        <td>Leibniz</td>
+                        <td class="num">10</td>
+                        <td class="num">12</td>
+                        <td class="num success">1.2x</td>
+                        <td class="num">11</td>
+                        <td class="num success">1.1x</td>
+                    </tr>
+<tr>
+                        <td>Mandelbrot</td>
+                        <td class="num">8</td>
+                        <td class="num">11</td>
+                        <td class="num success">1.4x</td>
+                        <td class="num">10</td>
+                        <td class="num success">1.2x</td>
+                    </tr>
+<tr>
+                        <td>Newton</td>
+                        <td class="num">8</td>
+                        <td class="num">10</td>
+                        <td class="num success">1.2x</td>
+                        <td class="num">10</td>
+                        <td class="num success">1.2x</td>
+                    </tr>
+
+                </tbody>
+            </table>
+            <p class="note">Compiled ual should be within 1.0-2.0x of C for compute-heavy workloads</p>
+        </div>
+
+        <div class="card">
+            <h2>Analysis: iual Interpreter vs Compiled</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Benchmark</th>
+                        <th class="num">ual-Go (ms)</th>
+                        <th class="num">iual (ms)</th>
+                        <th class="num">iual / ual-Go</th>
+                    </tr>
+                </thead>
+                <tbody>
+<tr>
+                        <td>Leibniz</td>
+                        <td class="num">12</td>
+                        <td class="num">38</td>
+                        <td class="num warning">3.2x</td>
+                    </tr>
+<tr>
+                        <td>Mandelbrot</td>
+                        <td class="num">11</td>
+                        <td class="num">12</td>
+                        <td class="num success">1.1x</td>
+                    </tr>
+<tr>
+                        <td>Newton</td>
+                        <td class="num">10</td>
+                        <td class="num">9</td>
+                        <td class="num success">0.9x</td>
+                    </tr>
+
+                </tbody>
+            </table>
+            <p class="note">Threaded code compilation makes iual competitive on structured loops</p>
+        </div>
+
+        <div class="card">
+            <h2>Analysis: iual vs Python</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Benchmark</th>
+                        <th class="num">Python (ms)</th>
+                        <th class="num">iual (ms)</th>
+                        <th class="num">iual Speedup</th>
+                    </tr>
+                </thead>
+                <tbody>
+<tr>
+                        <td>Leibniz</td>
+                        <td class="num">238</td>
+                        <td class="num">38</td>
+                        <td class="num success">6.3x faster</td>
+                    </tr>
+<tr>
+                        <td>Mandelbrot</td>
+                        <td class="num">198</td>
+                        <td class="num">12</td>
+                        <td class="num success">16.5x faster</td>
+                    </tr>
+<tr>
+                        <td>Newton</td>
+                        <td class="num">192</td>
+                        <td class="num">9</td>
+                        <td class="num success">21.3x faster</td>
+                    </tr>
+
+                </tbody>
+            </table>
+            <p class="note">iual beats Python on every benchmark through threaded code compilation</p>
+        </div>
+
+        </div>
+        
+        <footer>
+            ual v0.7.4 — <a href="https://github.com/ha1tch/ual">github.com/ha1tch/ual</a>
+        </footer>
+    </div>
+    
+    <script>
+        // Detect dark mode for chart colors
+        const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        const gridColor = isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)';
+        const textColor = isDark ? '#aaa' : '#666';
+        
+        Chart.defaults.color = textColor;
+        Chart.defaults.borderColor = gridColor;
+        
+        const backendCtx = document.getElementById('backendChart').getContext('2d');
+        new Chart(backendCtx, {
+            type: 'bar',
+            data: {
+                labels: ["Compute Leibniz", "Compute Mandelbrot", "Compute Newton"],
+                datasets: [
+                    { label: 'Go', data: [12, 11, 10], backgroundColor: 'rgba(54, 162, 235, 0.7)' },
+                    { label: 'Rust', data: [11, 10, 10], backgroundColor: 'rgba(255, 159, 64, 0.7)' },
+                    { label: 'iual', data: [38, 12, 9], backgroundColor: 'rgba(75, 192, 192, 0.7)' }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { position: 'top' } },
+                scales: { 
+                    y: { 
+                        beginAtZero: true, 
+                        title: { display: true, text: 'Time (ms)' },
+                        grid: { color: gridColor }
+                    },
+                    x: { grid: { color: gridColor } }
+                }
+            }
+        });
+        
+        const sizeCtx = document.getElementById('sizeChart').getContext('2d');
+        new Chart(sizeCtx, {
+            type: 'bar',
+            data: {
+                labels: ['Go', 'Rust', 'iual'],
+                datasets: [{
+                    label: 'Size (KB)',
+                    data: [1568, 344, 3030],
+                    backgroundColor: ['rgba(54, 162, 235, 0.7)', 'rgba(255, 159, 64, 0.7)', 'rgba(75, 192, 192, 0.7)']
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: { 
+                    y: { 
+                        beginAtZero: true, 
+                        title: { display: true, text: 'Size (KB)' },
+                        grid: { color: gridColor }
+                    },
+                    x: { grid: { color: gridColor } }
+                }
+            }
+        });
+    </script>
+</body>
+</html>

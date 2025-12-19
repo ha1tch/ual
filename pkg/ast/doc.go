@@ -1,6 +1,6 @@
-// Package ast defines the Abstract Syntax Tree nodes for UAL programs.
+// Package ast defines the Abstract Syntax Tree nodes for ual programs.
 //
-// The AST represents the parsed structure of a UAL program and is used by both
+// The AST represents the parsed structure of a ual program and is used by both
 // the compiler (ual) and interpreter (iual). All node types implement the Node
 // interface, with statements implementing Stmt and expressions implementing Expr.
 //

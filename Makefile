@@ -1,7 +1,10 @@
 # ual Makefile
 # Usage: make [target]
 
-.PHONY: all build build-compiler build-interpreter test test-runtime test-examples test-interpreter bench install clean help
+.PHONY: all build build-compiler build-interpreter test test-runtime test-examples test-interpreter install clean help
+.PHONY: test-go test-rust test-iual test-correctness test-update test-negative test-unit
+.PHONY: benchmark benchmark-quick benchmark-go benchmark-rust benchmark-iual benchmark-json
+.PHONY: bench-micro bench-micro-compute bench-micro-pipeline bench-micro-overhead bench-runtime bench-compute bench-stack
 
 # Default target
 all: build
@@ -19,7 +22,7 @@ GOBUILD := $(GO) build
 UAL_CMD_DIR := cmd/ual
 IUAL_CMD_DIR := cmd/iual
 EXAMPLES_DIR := examples
-BENCH_DIR := benchmarks
+MICRO_BENCH_DIR := tests/go-microbenchmarks
 RUNTIME_DIR := pkg/runtime
 
 # Output binaries
@@ -47,9 +50,13 @@ build-interpreter:
 # Test targets
 #------------------------------------------------------------------------------
 
-test: test-runtime test-examples test-interpreter
+test: test-unit test-correctness test-negative
 	@echo ""
 	@echo "All tests passed."
+
+test-quick: test-runtime test-examples test-interpreter
+	@echo ""
+	@echo "Quick tests passed."
 
 test-runtime:
 	@echo "Testing runtime library..."
@@ -124,14 +131,112 @@ test-compile: build-compiler
 	echo "Compile tests passed."
 
 #------------------------------------------------------------------------------
+# Unit Tests
+#------------------------------------------------------------------------------
+
+test-unit:
+	@echo "Running unit tests..."
+	@$(GOTEST) -v ./pkg/runtime/ 2>&1 | grep -E "^(=== RUN|--- PASS|--- FAIL|PASS|FAIL|ok)"
+	@$(GOTEST) -v ./cmd/iual/ 2>&1 | grep -E "^(=== RUN|--- PASS|--- FAIL|PASS|FAIL|ok)"
+	@echo "Unit tests passed."
+
+#------------------------------------------------------------------------------
+# Negative Tests (Error Detection)
+#------------------------------------------------------------------------------
+
+test-negative: build-interpreter
+	@echo "Running negative tests..."
+	@chmod +x ./tests/negative/run_negative_tests.sh
+	@./tests/negative/run_negative_tests.sh
+
+#------------------------------------------------------------------------------
+# Three-Way Correctness Tests (Go vs Rust vs iual)
+#------------------------------------------------------------------------------
+
+TEST_RUNNER := ./tests/correctness/run_all.sh
+
+test-correctness: build
+	@echo "Running three-way correctness tests..."
+	@chmod +x $(TEST_RUNNER)
+	@$(TEST_RUNNER) --all
+
+test-go: build
+	@echo "Testing Go backend..."
+	@chmod +x $(TEST_RUNNER)
+	@$(TEST_RUNNER) --go --quiet
+
+test-rust: build
+	@echo "Testing Rust backend..."
+	@chmod +x $(TEST_RUNNER)
+	@$(TEST_RUNNER) --rust --quiet
+
+test-iual: build
+	@echo "Testing iual interpreter..."
+	@chmod +x $(TEST_RUNNER)
+	@$(TEST_RUNNER) --iual --quiet
+
+test-update: build
+	@echo "Updating expected outputs from Go backend..."
+	@chmod +x $(TEST_RUNNER)
+	@$(TEST_RUNNER) --update
+
+#------------------------------------------------------------------------------
+# Cross-Backend Benchmark Targets
+#------------------------------------------------------------------------------
+
+BENCH_RUNNER := ./tests/benchmarks/run_unified.sh
+
+benchmark: build
+	@echo "Running cross-backend benchmarks..."
+	@chmod +x $(BENCH_RUNNER)
+	@$(BENCH_RUNNER) --full --all
+
+benchmark-quick: build
+	@echo "Running quick benchmark smoke test..."
+	@chmod +x $(BENCH_RUNNER)
+	@$(BENCH_RUNNER) --quick --backends
+
+benchmark-go: build
+	@echo "Benchmarking Go backend..."
+	@chmod +x $(BENCH_RUNNER)
+	@$(BENCH_RUNNER) --full --backends
+
+benchmark-rust: build
+	@echo "Benchmarking Rust backend..."
+	@chmod +x $(BENCH_RUNNER)
+	@$(BENCH_RUNNER) --full --backends
+
+benchmark-iual: build
+	@echo "Benchmarking iual interpreter..."
+	@chmod +x $(BENCH_RUNNER)
+	@$(BENCH_RUNNER) --full --backends
+
+benchmark-json: build
+	@chmod +x $(BENCH_RUNNER)
+	@$(BENCH_RUNNER) --full --all --json
+
+#------------------------------------------------------------------------------
 # Benchmark targets
 #------------------------------------------------------------------------------
 
-bench: build
-	@echo "Running benchmarks..."
-	@cd $(BENCH_DIR) && $(GOTEST) -bench=. -benchmem -count=3 2>/dev/null || \
-		echo "Note: Run 'make bench-setup' first if benchmarks fail"
+# Go microbenchmarks (codegen quality, overhead analysis)
+bench-micro:
+	@echo "Running Go microbenchmarks..."
+	@cd $(MICRO_BENCH_DIR) && $(GOTEST) -bench=. -benchmem -count=3
 
+bench-micro-compute:
+	@echo "Running compute block microbenchmarks..."
+	@cd $(MICRO_BENCH_DIR) && $(GOTEST) -bench=BenchmarkCompute -benchmem -count=3
+
+bench-micro-pipeline:
+	@echo "Running pipeline microbenchmarks..."
+	@cd $(MICRO_BENCH_DIR) && $(GOTEST) -bench=BenchmarkPipeline -benchmem -count=3
+
+bench-micro-overhead:
+	@echo "Running overhead microbenchmarks..."
+	@cd $(MICRO_BENCH_DIR) && $(GOTEST) -bench=BenchmarkOverhead -benchmem -count=3
+
+# Runtime unit benchmarks
 bench-runtime:
 	@echo "Running runtime benchmarks..."
 	@$(GOTEST) -bench=. -benchmem -count=3 ./$(RUNTIME_DIR)
@@ -207,8 +312,25 @@ help:
 	@echo "  test-interpreter   Run examples with interpreter"
 	@echo "  test-compile       Compile examples only (no run)"
 	@echo ""
+	@echo "Three-way correctness tests (Go vs Rust vs iual):"
+	@echo "  test-correctness   Run all three backends against expected outputs"
+	@echo "  test-go            Test Go backend only"
+	@echo "  test-rust          Test Rust backend only"
+	@echo "  test-iual          Test iual interpreter only"
+	@echo "  test-update        Regenerate expected outputs from Go backend"
+	@echo ""
 	@echo "Benchmark targets:"
-	@echo "  bench              Run all benchmarks"
+	@echo "  benchmark          Full e2e benchmark suite with HTML report"
+	@echo "  benchmark-quick    Quick smoke test (1 iteration)"
+	@echo "  benchmark-json     JSON output for CI"
+	@echo ""
+	@echo "Go microbenchmarks (ns-level codegen analysis):"
+	@echo "  bench-micro        Run all Go microbenchmarks"
+	@echo "  bench-micro-compute  Codegen quality benchmarks"
+	@echo "  bench-micro-pipeline Full pattern benchmarks"
+	@echo "  bench-micro-overhead Overhead isolation benchmarks"
+	@echo ""
+	@echo "Runtime benchmarks:"
 	@echo "  bench-runtime      Run pkg/runtime benchmarks"
 	@echo "  bench-compute      Run compute block benchmarks"
 	@echo "  bench-stack        Run stack operation benchmarks"

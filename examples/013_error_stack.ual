@@ -1,4 +1,4 @@
--- 13: Application-level error handling with @error stack
+-- 013: Application-level error handling with @error stack
 -- Unlike panic (which unwinds), @error is for recoverable errors
 
 -- Push some errors

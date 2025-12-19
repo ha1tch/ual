@@ -1,0 +1,57 @@
+-- bench_compute_mandelbrot.ual
+-- Benchmark: Mandelbrot escape iteration (50x50 grid)
+
+@size = stack.new(f64)
+@result = stack.new(f64)
+
+@size push(50.0)
+
+@size {
+}.compute({|gridsize|
+    var total = 0.0
+    var max_iter = 100.0
+    var escape = 4.0
+    
+    var x_min = 0.0 - 2.0
+    var x_max = 1.0
+    var y_min = 0.0 - 1.5
+    var y_max = 1.5
+    
+    var x_step = (x_max - x_min) / gridsize
+    var y_step = (y_max - y_min) / gridsize
+    
+    var py = 0.0
+    while (py < gridsize) {
+        var ci = y_min + (py * y_step)
+        var px = 0.0
+        
+        while (px < gridsize) {
+            var cr = x_min + (px * x_step)
+            
+            var zr = 0.0
+            var zi = 0.0
+            var iter = 0.0
+            
+            while (iter < max_iter) {
+                var zr2 = zr * zr
+                var zi2 = zi * zi
+                
+                if ((zr2 + zi2) > escape) {
+                    break
+                }
+                
+                zi = (2.0 * zr * zi) + ci
+                zr = (zr2 - zi2) + cr
+                iter = iter + 1.0
+            }
+            
+            total = total + iter
+            px = px + 1.0
+        }
+        py = py + 1.0
+    }
+    
+    return total
+})
+
+@size dot

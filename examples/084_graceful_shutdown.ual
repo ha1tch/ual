@@ -1,0 +1,85 @@
+-- 084: Graceful Shutdown
+-- Workers finish current task before exiting
+-- Demonstrates clean termination with in-flight work
+
+@work = stack.new(i64)
+@work perspective(FIFO)
+@results = stack.new(i64)
+@acks = stack.new(i64)
+
+-- Push work FIRST: 8 tasks + 2 sentinels
+@work < 2
+@work < 3
+@work < 4
+@work < 5
+@work < 6
+@work < 7
+@work < 8
+@work < 9
+@work < -1
+@work < -1
+
+-- Worker 1: processes work until shutdown
+@spawn < {
+    var processed i64 = 0
+    var running i64 = 1
+    while (running == 1) {
+        var task i64 = 0
+        @work take:task
+        if (task == -1) {
+            -- Shutdown signal received
+            push:0 let:running
+        } else {
+            -- Process task
+            var result i64 = task * task
+            @results < result
+            push:processed inc let:processed
+        }
+    }
+    -- Report how many tasks completed
+    @acks < processed
+}
+
+-- Worker 2
+@spawn < {
+    var processed i64 = 0
+    var running i64 = 1
+    while (running == 1) {
+        var task i64 = 0
+        @work take:task
+        if (task == -1) {
+            push:0 let:running
+        } else {
+            var result i64 = task * task
+            @results < result
+            push:processed inc let:processed
+        }
+    }
+    @acks < processed
+}
+
+-- Start workers
+@spawn pop play pop play
+
+-- Wait for acknowledgments
+var ack1 i64 = 0
+var ack2 i64 = 0
+@acks take:ack1
+@acks take:ack2
+
+-- Total tasks processed should be 8
+var total_processed i64 = ack1 + ack2
+
+-- Collect all results and sum
+-- 4 + 9 + 16 + 25 + 36 + 49 + 64 + 81 = 284
+var sum i64 = 0
+var i i64 = 0
+while (i < total_processed) {
+    var r i64 = 0
+    @results take:r
+    push:(sum + r) let:sum
+    push:i inc let:i
+}
+
+push:total_processed dot
+push:sum dot

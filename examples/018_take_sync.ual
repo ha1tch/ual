@@ -1,4 +1,4 @@
--- 18: @stack take — blocking pop
+-- 018: @stack take — blocking pop
 -- Demonstrates synchronization with take
 
 @results = stack.new(i64)

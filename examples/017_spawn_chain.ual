@@ -1,11 +1,29 @@
--- 17: @spawn chaining
--- Multiple spawn ops on one line
+-- 017: @spawn chaining
+-- Multiple spawn ops on one line, with synchronization for deterministic output
 
-@spawn < { push:100 dot }
-@spawn < { push:200 dot }
-@spawn < { push:300 dot }
+@done = stack.new(i64)
+
+@spawn < { 
+    @done < 100
+}
+@spawn < { 
+    @done < 200
+}
+@spawn < { 
+    @done < 300
+}
 
 -- Chain: pop and play all three
 @spawn pop play pop play pop play
 
+-- Wait for all three results (order may vary, but we'll collect all)
+var a i64 = 0
+var b i64 = 0
+var c i64 = 0
+@done take:a
+@done take:b
+@done take:c
+
+-- Print sum to get deterministic output
+push:(a + b + c) dot
 push:999 dot

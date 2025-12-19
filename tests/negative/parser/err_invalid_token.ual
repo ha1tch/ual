@@ -1,0 +1,3 @@
+-- Parser error test: invalid token
+@stack = stack.new(i64)
+@stack push(###invalid###)

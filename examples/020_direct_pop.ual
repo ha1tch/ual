@@ -1,4 +1,4 @@
--- 20: Direct pop/take to variable
+-- 020: Direct pop/take to variable
 -- Tests pop:var and take:var syntax
 
 @inbox = stack.new(i64)

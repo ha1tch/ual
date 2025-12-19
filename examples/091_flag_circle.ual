@@ -1,0 +1,100 @@
+-- 091: Flag with Circle
+-- Three horizontal stripes (orange, green, purple) with red circle in center
+-- Tests rectangle fill and per-pixel ellipse computation
+-- Circle is 2x wide to compensate for non-square terminal characters
+
+-- Constants (50% bigger than original)
+var width i64 = 90
+var height i64 = 32
+var cx i64 = 45       -- center x
+var cy i64 = 16       -- center y
+var rx i64 = 14       -- horizontal radius (2x vertical for square appearance)
+var ry i64 = 7        -- vertical radius
+
+-- Color codes (256-color palette)
+var orange i64 = 208
+var green i64 = 34
+var purple i64 = 129
+var red i64 = 196
+
+-- Clear screen
+print("\e[2J\e[1;1H")
+
+-- Draw flag row by row
+var y i64 = 0
+while (y < height) {
+    -- Determine stripe color based on row (thirds)
+    var stripe_color i64 = 0
+    if (y < 11) {
+        push:orange let:stripe_color
+    }
+    if (y >= 11) {
+        if (y < 22) {
+            push:green let:stripe_color
+        }
+    }
+    if (y >= 22) {
+        push:purple let:stripe_color
+    }
+    
+    -- Position cursor at start of row (row = y + 2 to leave space at top)
+    var row i64 = 0
+    push:(y + 2) let:row
+    print("\e[")
+    print:row
+    print(";1H")
+    
+    -- Draw each column
+    var x i64 = 0
+    while (x < width) {
+        -- Compute normalized distance for ellipse: (dx/rx)² + (dy/ry)²
+        var dx i64 = 0
+        var dy i64 = 0
+        push:(x - cx) let:dx
+        push:(y - cy) let:dy
+        
+        -- For ellipse: (dx²/rx²) + (dy²/ry²) <= 1
+        -- Multiply through by rx²*ry² to avoid division:
+        -- dx²*ry² + dy²*rx² <= rx²*ry²
+        var dx_sq i64 = 0
+        var dy_sq i64 = 0
+        push:(dx * dx) let:dx_sq
+        push:(dy * dy) let:dy_sq
+        
+        var ry_sq i64 = 0
+        var rx_sq i64 = 0
+        push:(ry * ry) let:ry_sq
+        push:(rx * rx) let:rx_sq
+        
+        var left_side i64 = 0
+        var right_side i64 = 0
+        push:(dx_sq * ry_sq + dy_sq * rx_sq) let:left_side
+        push:(rx_sq * ry_sq) let:right_side
+        
+        -- Choose color: red if inside ellipse, stripe color otherwise
+        var color i64 = 0
+        if (left_side <= right_side) {
+            push:red let:color
+        }
+        if (left_side > right_side) {
+            push:stripe_color let:color
+        }
+        
+        -- Set background color and print space
+        print("\e[48;5;")
+        print:color
+        print("m ")
+        
+        push:(x + 1) let:x
+    }
+    
+    -- Reset color at end of row
+    print("\e[0m")
+    println("")
+    
+    push:(y + 1) let:y
+}
+
+-- Final position
+print("\e[36;1H\e[0m")
+println("Flag complete.")

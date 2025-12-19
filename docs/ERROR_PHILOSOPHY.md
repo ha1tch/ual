@@ -1,4 +1,4 @@
-# The Philosophy of Error Handling in UAL
+# The Philosophy of Error Handling in ual
 
 **Version 0.8 Design Rationale**
 
@@ -8,7 +8,7 @@
 
 Errors are not values to be passed around. They are facts about what happened — evidence of failed state transitions. Treating errors as ordinary return values, as most languages do, creates a fundamental category error that leads to systematic mishandling.
 
-UAL's error system is built on a different premise: **errors must be acknowledged before computation can proceed**. This is not a restriction on the programmer's freedom; it is a recognition that ignoring errors does not make them disappear — it merely defers their consequences to a place where they become harder to diagnose and fix.
+ual's error system is built on a different premise: **errors must be acknowledged before computation can proceed**. This is not a restriction on the programmer's freedom; it is a recognition that ignoring errors does not make them disappear — it merely defers their consequences to a place where they become harder to diagnose and fix.
 
 ---
 
@@ -93,15 +93,15 @@ Rust makes it a compile-time error to ignore a `Result`. You cannot access the s
 
 If you truly want to ignore an error, you must write `.unwrap()` or `.expect()` — explicit markers that say "I accept this will panic if wrong." The intentionality is captured in the source.
 
-Rust's approach is excellent. UAL's differs in mechanism but shares the core principle: **errors must be explicitly acknowledged**.
+Rust's approach is excellent. ual's differs in mechanism but shares the core principle: **errors must be explicitly acknowledged**.
 
 ---
 
-## 3. UAL's Model: The Error Stack
+## 3. ual's Model: The Error Stack
 
 ### 3.1 Separation of Channels
 
-In UAL, errors flow through a separate channel from data:
+In ual, errors flow through a separate channel from data:
 
 ```
 Data channel:    @source → operation → @destination
@@ -122,7 +122,7 @@ operation3()    // and this
 
 ### 3.2 Forced Acknowledgment
 
-Here is UAL's key mechanism: **any stack operation checks whether `@error` is non-empty. If unacknowledged errors exist, the program panics.**
+Here is ual's key mechanism: **any stack operation checks whether `@error` is non-empty. If unacknowledged errors exist, the program panics.**
 
 ```ual
 risky_operation()      // pushes to @error on failure
@@ -268,7 +268,7 @@ fetch_data(@result)
 )
 ```
 
-This is graceful — the error is acknowledged, its nature is examined, and appropriate action is taken. UAL's model encourages this; error-as-value models permit it but don't encourage it.
+This is graceful — the error is acknowledged, its nature is examined, and appropriate action is taken. ual's model encourages this; error-as-value models permit it but don't encourage it.
 
 ### 4.3 The Transaction Analogy
 
@@ -283,7 +283,7 @@ COMMIT;                        -- should this succeed?
 
 No reasonable database allows a failed transaction to continue and commit. The failure must be handled — rollback, retry, or explicitly acknowledge and proceed with a new transaction.
 
-UAL treats computation similarly: the program is a sequence of state transitions, and a failed transition must be addressed before subsequent transitions occur. This is not novel; it is applying established principles from data management to general computation.
+ual treats computation similarly: the program is a sequence of state transitions, and a failed transition must be addressed before subsequent transitions occur. This is not novel; it is applying established principles from data management to general computation.
 
 ### 4.4 Concurrency Demands It
 
@@ -305,7 +305,7 @@ If `process(task)` fails and errors are silently ignored:
 - The failure is invisible to coordination logic
 - System state diverges from assumed state
 
-Distributed systems literature is full of catastrophic failures caused by ignored errors in concurrent code. UAL's model makes such oversights impossible — not through programmer discipline, but through language mechanics.
+Distributed systems literature is full of catastrophic failures caused by ignored errors in concurrent code. ual's model makes such oversights impossible — not through programmer discipline, but through language mechanics.
 
 ---
 
@@ -391,15 +391,15 @@ The only restriction is that you must handle before the next stack operation. If
 
 ### 5.5 "Rust does this at compile time, isn't that better?"
 
-Rust's compile-time checking catches errors earlier. UAL's runtime checking is strictly less powerful.
+Rust's compile-time checking catches errors earlier. ual's runtime checking is strictly less powerful.
 
-Response: Compile-time checking is indeed preferable when available. UAL's checking is a pragmatic choice given the language's design:
+Response: Compile-time checking is indeed preferable when available. ual's checking is a pragmatic choice given the language's design:
 
-- UAL compiles to Go, which lacks Rust's type system
-- UAL's stack-based model makes static error tracking complex
+- ual compiles to Go, which lacks Rust's type system
+- ual's stack-based model makes static error tracking complex
 - Runtime checking still catches 100% of error-ignoring bugs (at runtime)
 
-The comparison isn't "UAL vs Rust" but "UAL vs Go/Python/JavaScript" — languages where ignoring errors is trivially easy. Against that baseline, UAL's runtime checking is a significant improvement.
+The comparison isn't "ual vs Rust" but "ual vs Go/Python/JavaScript" — languages where ignoring errors is trivially easy. Against that baseline, ual's runtime checking is a significant improvement.
 
 ---
 
@@ -467,7 +467,7 @@ This last point is important: you cannot "exit your way out" of error handling. 
 
 ## 7. Comparison Summary
 
-| Aspect | Go | Exceptions | Rust | UAL |
+| Aspect | Go | Exceptions | Rust | ual |
 |--------|----|-----------:|------|-----|
 | Error visibility | Explicit (return value) | Hidden (throw site) | Explicit (Result type) | Explicit (separate stack) |
 | Ignoring errors | Easy (`_`) | Easy (empty catch) | Hard (must `.unwrap()`) | Hard (must `clear` or handle) |
@@ -481,7 +481,7 @@ This last point is important: you cannot "exit your way out" of error handling. 
 
 ## 8. Conclusion
 
-UAL's error handling is not about restricting programmers. It is about aligning language mechanics with computational reality.
+ual's error handling is not about restricting programmers. It is about aligning language mechanics with computational reality.
 
 Errors represent failed state transitions. Ignoring failed transitions and continuing computation produces corrupt state. Corrupt state propagates. Systems built on ignored errors are systems with latent failures waiting to manifest.
 
@@ -489,8 +489,8 @@ The forced-acknowledgment model makes a simple demand: if something failed, say 
 
 This is not a burden. It is a service. The language is telling you: something went wrong here. You must decide what that means.
 
-That decision is the programmer's job. Forcing the decision to be made is the language's job. UAL does its job.
+That decision is the programmer's job. Forcing the decision to be made is the language's job. ual does its job.
 
 ---
 
-*This document accompanies DESIGN_v0.8.md and describes the philosophical basis for UAL's error handling architecture.*
+*This document accompanies DESIGN_v0.8.md and describes the philosophical basis for ual's error handling architecture.*

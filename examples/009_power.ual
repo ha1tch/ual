@@ -1,4 +1,4 @@
--- 09: Power - Compute base^exp for multiple values
+-- 009: Power - Compute base^exp for multiple values
 
 var totalPow i64 = 0
 var i i64 = 1

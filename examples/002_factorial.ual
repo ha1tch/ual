@@ -1,4 +1,4 @@
--- 02: Factorial - Compute n!
+-- 002: Factorial - Compute n!
 
 var num i64 = 12
 var fact i64 = 1

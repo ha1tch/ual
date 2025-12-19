@@ -1,4 +1,4 @@
--- 40: Basic select - concurrent wait on multiple stacks
+-- 031: Basic select - concurrent wait on multiple stacks
 -- Demonstrates the .select() construct
 
 @inbox = stack.new(i64)

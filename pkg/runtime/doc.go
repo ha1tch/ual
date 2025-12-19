@@ -1,4 +1,4 @@
-// Package runtime provides the stack-based runtime library for compiled UAL programs.
+// Package runtime provides the stack-based runtime library for compiled ual programs.
 //
 // This package implements:
 //   - Stack: thread-safe stack with multiple perspectives (LIFO, FIFO, Indexed, Hash)
@@ -7,7 +7,7 @@
 //   - Bring: element transfer between stacks
 //   - WorkSteal: work-stealing scheduler
 //
-// Compiled UAL programs import this package as:
+// Compiled ual programs import this package as:
 //
 //	import ual "github.com/ha1tch/ual/pkg/runtime"
 //

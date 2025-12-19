@@ -1,0 +1,38 @@
+-- bench_concurrency_spawn.ual
+-- Benchmark: Spawn overhead (10 workers)
+
+@results = stack.new(i64)
+@done = stack.new(i64)
+
+-- Create 10 spawn functions
+@spawn < { @results < 1 @done < 1 }
+@spawn < { @results < 2 @done < 1 }
+@spawn < { @results < 3 @done < 1 }
+@spawn < { @results < 4 @done < 1 }
+@spawn < { @results < 5 @done < 1 }
+@spawn < { @results < 6 @done < 1 }
+@spawn < { @results < 7 @done < 1 }
+@spawn < { @results < 8 @done < 1 }
+@spawn < { @results < 9 @done < 1 }
+@spawn < { @results < 10 @done < 1 }
+
+-- Start all tasks
+@spawn pop play pop play pop play pop play pop play
+@spawn pop play pop play pop play pop play pop play
+
+-- Wait for completion
+var count i64 = 0
+while (count < 10) {
+    var d i64 = 0
+    @done take:d
+    push:(count + 1) let:count
+}
+
+-- Sum results
+var sum i64 = 0
+@results for{|v|
+    push:(sum + v) let:sum
+}
+
+-- Expected: 1+2+...+10 = 55
+push:sum dot

@@ -1,0 +1,9 @@
+52
+Operation succeeded
+Division failed:
+division by zero
+Minor detected
+Inner partial
+50
+Outer completed
+Consider examples complete

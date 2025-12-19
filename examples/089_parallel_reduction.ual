@@ -1,0 +1,116 @@
+-- 089: Parallel Reduction Pattern
+-- Each worker computes partial sum of squares for its assigned range,
+-- using local stack for accumulation and compute block for reduction.
+-- Final step combines all partial results.
+--
+-- Computes: 1² + 2² + 3² + ... + 12² = 650
+
+@partial_sums = stack.new(i64)
+
+-- Worker 1: compute 1² + 2² + 3² + 4² = 30
+@spawn < {
+    local @work = stack.new(i64)
+    
+    -- Square and accumulate
+    @work < 1   -- 1²
+    @work < 4   -- 2²
+    @work < 9   -- 3²
+    @work < 16  -- 4²
+    
+    -- Reduce via compute
+    var a i64 = 0
+    var b i64 = 0
+    var c i64 = 0
+    var d i64 = 0
+    @work pop:d pop:c pop:b pop:a
+    
+    @dstack push:a push:b push:c push:d
+    @dstack {
+    }.compute(
+        {|v1, v2, v3, v4|
+            return v1 + v2 + v3 + v4
+        }
+    )
+    var sum i64 = 0
+    pop:sum
+    @partial_sums < sum
+}
+
+-- Worker 2: compute 5² + 6² + 7² + 8² = 174
+@spawn < {
+    local @work = stack.new(i64)
+    
+    @work < 25  -- 5²
+    @work < 36  -- 6²
+    @work < 49  -- 7²
+    @work < 64  -- 8²
+    
+    var a i64 = 0
+    var b i64 = 0
+    var c i64 = 0
+    var d i64 = 0
+    @work pop:d pop:c pop:b pop:a
+    
+    @dstack push:a push:b push:c push:d
+    @dstack {
+    }.compute(
+        {|v1, v2, v3, v4|
+            return v1 + v2 + v3 + v4
+        }
+    )
+    var sum i64 = 0
+    pop:sum
+    @partial_sums < sum
+}
+
+-- Worker 3: compute 9² + 10² + 11² + 12² = 446
+@spawn < {
+    local @work = stack.new(i64)
+    
+    @work < 81   -- 9²
+    @work < 100  -- 10²
+    @work < 121  -- 11²
+    @work < 144  -- 12²
+    
+    var a i64 = 0
+    var b i64 = 0
+    var c i64 = 0
+    var d i64 = 0
+    @work pop:d pop:c pop:b pop:a
+    
+    @dstack push:a push:b push:c push:d
+    @dstack {
+    }.compute(
+        {|v1, v2, v3, v4|
+            return v1 + v2 + v3 + v4
+        }
+    )
+    var sum i64 = 0
+    pop:sum
+    @partial_sums < sum
+}
+
+-- Launch workers
+@spawn pop play pop play pop play
+
+-- Collect partial sums
+var p1 i64 = 0
+var p2 i64 = 0
+var p3 i64 = 0
+@partial_sums take:p1
+@partial_sums take:p2
+@partial_sums take:p3
+
+-- Final reduction
+@dstack push:p1 push:p2 push:p3
+@dstack {
+}.compute(
+    {|a, b, c|
+        return a + b + c
+    }
+)
+var total i64 = 0
+pop:total
+
+-- Should be 30 + 174 + 446 = 650
+println:total

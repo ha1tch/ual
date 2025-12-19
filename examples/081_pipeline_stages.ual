@@ -1,0 +1,85 @@
+-- 081: Multi-Stage Pipeline
+-- Data flows through three processing stages concurrently
+-- Each stage runs in its own goroutine
+
+@input = stack.new(i64)
+@stage1_out = stack.new(i64)
+@stage2_out = stack.new(i64)
+@output = stack.new(i64)
+@done = stack.new(i64)
+
+-- Stage 1: Double the input
+@spawn < {
+    var count i64 = 0
+    while (count < 5) {
+        var val i64 = 0
+        @input take:val
+        @stage1_out < (val * 2)
+        push:count inc let:count
+    }
+    @done < 1
+}
+
+-- Stage 2: Add 100
+@spawn < {
+    var count i64 = 0
+    while (count < 5) {
+        var val i64 = 0
+        @stage1_out take:val
+        @stage2_out < (val + 100)
+        push:count inc let:count
+    }
+    @done < 1
+}
+
+-- Stage 3: Square the result
+@spawn < {
+    var count i64 = 0
+    while (count < 5) {
+        var val i64 = 0
+        @stage2_out take:val
+        @output < (val * val)
+        push:count inc let:count
+    }
+    @done < 1
+}
+
+-- Start all stages (order doesn't matter, they block on input)
+@spawn pop play pop play pop play
+
+-- Feed input: 1, 2, 3, 4, 5
+@input < 1
+@input < 2
+@input < 3
+@input < 4
+@input < 5
+
+-- Wait for pipeline to complete
+var d1 i64 = 0
+var d2 i64 = 0
+var d3 i64 = 0
+@done take:d1
+@done take:d2
+@done take:d3
+
+-- Collect and sum results
+-- Input 1: 1 -> 2 -> 102 -> 10404
+-- Input 2: 2 -> 4 -> 104 -> 10816
+-- Input 3: 3 -> 6 -> 106 -> 11236
+-- Input 4: 4 -> 8 -> 108 -> 11664
+-- Input 5: 5 -> 10 -> 110 -> 12100
+-- Sum: 56220
+var sum i64 = 0
+var r1 i64 = 0
+var r2 i64 = 0
+var r3 i64 = 0
+var r4 i64 = 0
+var r5 i64 = 0
+@output take:r1
+@output take:r2
+@output take:r3
+@output take:r4
+@output take:r5
+push:(r1 + r2 + r3 + r4 + r5) let:sum
+
+push:sum dot

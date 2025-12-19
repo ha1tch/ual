@@ -1,4 +1,4 @@
--- 10: Work Stealing simulation
+-- 010: Work Stealing simulation
 -- Shows the concept: owner takes from top, thief takes from bottom
 
 @tasks = stack.new(i64, cap: 100)

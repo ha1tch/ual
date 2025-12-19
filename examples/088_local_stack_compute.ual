@@ -1,0 +1,120 @@
+-- 088: Local Stacks with Compute Blocks
+-- Each worker accumulates values in a local stack, then uses a compute block
+-- to process the accumulated data. This pattern is useful for parallel
+-- map-reduce style algorithms where each worker collects intermediate results.
+
+@results = stack.new(i64)
+
+-- Worker 1: Accumulate squares, compute their sum
+@spawn < {
+    local @acc = stack.new(i64)
+    
+    -- Accumulate squares 1-5 into local stack
+    @acc < 1   -- 1²
+    @acc < 4   -- 2²
+    @acc < 9   -- 3²
+    @acc < 16  -- 4²
+    @acc < 25  -- 5²
+    
+    -- Use compute block to sum the accumulated values
+    -- Pop all 5 values and compute sum
+    var a i64 = 0
+    var b i64 = 0
+    var c i64 = 0
+    var d i64 = 0
+    var e i64 = 0
+    @acc pop:e pop:d pop:c pop:b pop:a
+    
+    @dstack push:a push:b push:c push:d push:e
+    @dstack {
+    }.compute(
+        {|v1, v2, v3, v4, v5|
+            return v1 + v2 + v3 + v4 + v5
+        }
+    )
+    var sum i64 = 0
+    pop:sum
+    @results < sum  -- 55
+}
+
+-- Worker 2: Accumulate cubes, compute their product (mod 1000 to stay small)
+@spawn < {
+    local @acc = stack.new(i64)
+    
+    -- Accumulate cubes 1-4
+    @acc < 1   -- 1³
+    @acc < 8   -- 2³
+    @acc < 27  -- 3³
+    @acc < 64  -- 4³
+    
+    var a i64 = 0
+    var b i64 = 0
+    var c i64 = 0
+    var d i64 = 0
+    @acc pop:d pop:c pop:b pop:a
+    
+    @dstack push:a push:b push:c push:d
+    @dstack {
+    }.compute(
+        {|v1, v2, v3, v4|
+            return v1 * v2 * v3 * v4
+        }
+    )
+    var prod i64 = 0
+    pop:prod
+    @results < prod  -- 13824
+}
+
+-- Worker 3: Fibonacci via local stack accumulation
+@spawn < {
+    local @fib = stack.new(i64)
+    
+    -- Build fibonacci sequence in local stack
+    @fib < 1   -- f1
+    @fib < 1   -- f2
+    @fib < 2   -- f3
+    @fib < 3   -- f4
+    @fib < 5   -- f5
+    @fib < 8   -- f6
+    @fib < 13  -- f7
+    @fib < 21  -- f8
+    
+    -- Sum all fibonacci numbers using compute
+    var f1 i64 = 0
+    var f2 i64 = 0
+    var f3 i64 = 0
+    var f4 i64 = 0
+    var f5 i64 = 0
+    var f6 i64 = 0
+    var f7 i64 = 0
+    var f8 i64 = 0
+    @fib pop:f8 pop:f7 pop:f6 pop:f5 pop:f4 pop:f3 pop:f2 pop:f1
+    
+    @dstack push:f1 push:f2 push:f3 push:f4 push:f5 push:f6 push:f7 push:f8
+    @dstack {
+    }.compute(
+        {|a, b, c, d, e, f, g, h|
+            return a + b + c + d + e + f + g + h
+        }
+    )
+    var sum i64 = 0
+    pop:sum
+    @results < sum  -- 54
+}
+
+-- Launch all workers
+@spawn pop play pop play pop play
+
+-- Collect results
+var r1 i64 = 0
+var r2 i64 = 0
+var r3 i64 = 0
+@results take:r1
+@results take:r2
+@results take:r3
+
+-- Print total only (individual results vary in order due to concurrency)
+-- Expected: 55 + 13824 + 54 = 13933
+var total i64 = 0
+push:(r1 + r2 + r3) let:total
+println:total

@@ -1,0 +1,24 @@
+-- bench_compute_leibniz.ual
+-- Benchmark: Leibniz series for π (1M iterations)
+
+@result = stack.new(f64)
+@result push(1000000.0)
+
+@result {
+}.compute({|terms|
+    var sum = 0.0
+    var sign = 1.0
+    var denom = 1.0
+    var idx = 0.0
+    
+    while (idx < terms) {
+        sum = sum + (sign / denom)
+        sign = 0.0 - sign
+        denom = denom + 2.0
+        idx = idx + 1.0
+    }
+    
+    return 4.0 * sum
+})
+
+@result dot

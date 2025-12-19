@@ -12,6 +12,7 @@ var b i64 = 1
 @fib push:a   -- 0
 
 var i i64 = 1
+var temp i64 = 0
 while (i < n) {
     @fib push:b
     push:a push:b add let:temp
@@ -19,7 +20,6 @@ while (i < n) {
     push:temp let:b
     push:i inc let:i
 }
-var temp i64 = 0
 
 -- Print fibonacci sequence
 @fib.fifo for{|v| push:v dot }
@@ -154,11 +154,11 @@ var threshold i64 = 10
 @input2 { push:1 push:2 push:3 push:4 push:5 }
 
 @mapped = stack.new(i64)
+var doubled2 i64 = 0
 @input2.fifo for{|v|
     push:v push:2 mul let:doubled2
     @mapped push:doubled2
 }
-var doubled2 i64 = 0
 
 @mapped.fifo for{|v| push:v dot }  -- 2, 4, 6, 8, 10
 
@@ -167,13 +167,13 @@ var doubled2 i64 = 0
 ------------------------------------------------------------
 var gcd_a i64 = 48
 var gcd_b i64 = 18
+var temp2 i64 = 0
 
 while (gcd_b > 0) {
     push:gcd_a push:gcd_b mod let:temp2
     push:gcd_b let:gcd_a
     push:temp2 let:gcd_b
 }
-var temp2 i64 = 0
 push:gcd_a dot  -- 6
 
 ------------------------------------------------------------
@@ -182,6 +182,7 @@ push:gcd_a dot  -- 6
 var checkNum i64 = 17
 var isPrime i64 = 1
 var divisor i64 = 2
+var remainder i64 = 0
 
 -- Simple trial division
 while (divisor < checkNum) {
@@ -192,7 +193,6 @@ while (divisor < checkNum) {
     }
     push:divisor inc let:divisor
 }
-var remainder i64 = 0
 
 push:isPrime dot  -- 1 (17 is prime)
 

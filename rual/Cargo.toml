@@ -1,0 +1,25 @@
+[package]
+name = "rual"
+version = "0.1.0"
+edition = "2021"
+authors = ["h0rax"]
+description = "Rust runtime for ual programs"
+license = "MIT"
+repository = "https://github.com/ha1tch/ual"
+keywords = ["ual", "runtime", "stack", "concurrency"]
+categories = ["concurrency", "data-structures"]
+
+[dependencies]
+parking_lot = "0.12"
+crossbeam-deque = "0.8"
+
+[dev-dependencies]
+bencher = "0.1"
+
+[[bench]]
+name = "stack_bench"
+harness = false
+
+[features]
+default = []
+# Future: simd, no_std support

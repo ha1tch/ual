@@ -1,0 +1,9 @@
+{
+  "version": "0.7.4",
+  "timestamp": "2025-12-19T08:59:26-03:00",
+  "iterations": 5,
+  "correctness": {"total":92,"go_pass":92,"rust_pass":92,"iual_pass":92},
+  "benchmarks": [{"name":"compute_leibniz","go_ms":12,"rust_ms":11,"iual_ms":38},{"name":"compute_mandelbrot","go_ms":11,"rust_ms":10,"iual_ms":12},{"name":"compute_newton","go_ms":10,"rust_ms":10,"iual_ms":9}],
+  "cross_language": {"c": {"leibniz": 10, "mandelbrot": 8, "newton": 8}, "rust_native": {"leibniz": 10, "mandelbrot": 8, "newton": 8}, "python": {"leibniz": 238, "mandelbrot": 198, "newton": 192}},
+  "binary_sizes": {"go_stripped":1606258,"rust_stripped":352904,"iual_stripped":3103600}
+}

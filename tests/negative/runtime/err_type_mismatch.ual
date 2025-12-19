@@ -1,0 +1,7 @@
+-- Runtime error test: type mismatch on pop
+@floats = stack.new(f64)
+@floats push(3.14)
+
+-- Try to pop f64 to dstack (i64) without conversion
+@floats pop
+-- This should error because f64 cannot go to dstack directly

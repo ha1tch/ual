@@ -1,8 +1,8 @@
-# UAL Design Decisions — Implementation Specification v0.8
+# ual Design Decisions — Implementation Specification v0.8
 
-**Document Purpose:** This specification captures design decisions made for UAL v0.8, intended for implementors continuing development. It assumes familiarity with UAL v0.7.3 architecture (lexer, parser, codegen in `cmd/ual/`, interpreter in `cmd/iual/`, runtime in `pkg/runtime/`).
+**Document Purpose:** This specification captures design decisions made for ual v0.8, intended for implementors continuing development. It assumes familiarity with ual v0.7.4 architecture (lexer, parser, codegen in `cmd/ual/`, interpreter in `cmd/iual/`, runtime in `pkg/runtime/`, Rust runtime in `rual/`).
 
-**Context:** These decisions emerged from analysis of UAL's concurrency model and its relationship to distributed systems patterns. The core insight is that UAL's stack-based primitives generalise naturally to I/O and network operations, and that the existing constructs (`select`, `consider`, `compute`) form a coherent system for handling time, outcomes, and interpretation.
+**Context:** These decisions emerged from analysis of ual's concurrency model and its relationship to distributed systems patterns. The core insight is that ual's stack-based primitives generalise naturally to I/O and network operations, and that the existing constructs (`select`, `consider`, `compute`) form a coherent system for handling time, outcomes, and interpretation.
 
 ---
 
@@ -201,7 +201,7 @@ b, err := step2(a)
 if err != nil { return err }
 ```
 
-UAL separates the error channel from the data channel:
+ual separates the error channel from the data channel:
 ```ual
 step1(@a)
 step2(@a, @b)
@@ -216,7 +216,7 @@ step3(@b, @c)
 ### 2.2 @error Stack Specification
 
 **Global Error Stack:**
-- Pre-declared in every UAL program (like `@dstack`, `@rstack`)
+- Pre-declared in every ual program (like `@dstack`, `@rstack`)
 - Perspective: LIFO (most recent error on top)
 - Element type: bytes (error messages as strings)
 
@@ -339,7 +339,7 @@ Go has:
 
 Two mechanisms because select can't express "all". And neither can express quorum ("k of N").
 
-UAL's `expect(n)` is the generalisation:
+ual's `expect(n)` is the generalisation:
 - `expect(1)` = select (any one)
 - `expect(all)` = WaitGroup (barrier)
 - `expect(k)` = quorum
@@ -653,7 +653,178 @@ No separate primitive needed.
 
 ---
 
-## 7. Implementation Priority
+## 7. Work-Stealing and Decoupled Views
+
+### 7.1 Design Rationale
+
+ual's perspective system (`LIFO`, `FIFO`, `Indexed`, `Hash`) isn't just about access patterns — it enables **decoupled views** where different accessors see the same data structure through different lenses. The canonical application is work-stealing.
+
+Traditional work-stealing (Go's scheduler, Rust's Rayon, Java's ForkJoinPool) uses a deque where:
+- **Owner** accesses LIFO (push/pop from bottom) — cache-friendly, processes recent items
+- **Thieves** access FIFO (steal from top) — load balancing, takes old items, reduces contention
+
+In most languages, this requires a specialised data structure with careful lock-free implementation. In ual, it's a natural consequence of perspectives:
+
+```ual
+@work = stack.new(Task)
+
+-- Owner's view (default LIFO)
+@work push(task)
+@work pop:next
+
+-- Thief's view (FIFO perspective)
+@work perspective(FIFO)
+@work pop:stolen    -- takes from opposite end
+```
+
+Same stack, two perspectives, no explicit synchronisation code.
+
+### 7.2 View Handles
+
+To make work-stealing practical, we need stable handles to different perspectives on the same stack:
+
+```ual
+@work = stack.new(Task)
+
+-- Create named views
+owner = @work.view(LIFO)    -- returns view handle
+thief = @work.view(FIFO)    -- different perspective, same data
+
+-- Use views independently
+owner.push(task)
+owner.pop:next
+
+thief.pop:stolen    -- steals from opposite end
+```
+
+Views are lightweight handles, not copies. All views share the underlying data and synchronisation.
+
+### 7.3 Work-Stealing Pool Pattern
+
+A complete work-stealing pool with multiple workers:
+
+```ual
+-- Create per-worker queues
+@queues = stack.new(stack)    -- stack of stacks
+
+var i i64 = 0
+while (i < num_workers) {
+    var q = stack.new(Task)
+    @queues push(q)
+    push:i inc let:i
+}
+
+-- Worker function: process own queue, steal when empty
+func worker(id i64, own View, others []View) {
+    while (running) {
+        -- Try own queue first (LIFO, cache-friendly)
+        var task Task = Task{}
+        if (own.try_pop:task) {
+            process(task)
+        } else {
+            -- Own queue empty, try stealing (FIFO from others)
+            var stolen bool = false
+            for other in others {
+                if (other.try_pop:task) {
+                    process(task)
+                    push:true let:stolen
+                    break
+                }
+            }
+            if (!stolen) {
+                yield()    -- nothing to do, yield CPU
+            }
+        }
+    }
+}
+
+-- Spawn workers with their queues and steal targets
+var worker_id i64 = 0
+while (worker_id < num_workers) {
+    var own = @queues[worker_id].view(LIFO)
+    var others = steal_targets(worker_id, @queues)    -- FIFO views of other queues
+    
+    @spawn < {
+        worker(worker_id, own, others)
+    }
+    @spawn pop play
+    
+    push:worker_id inc let:worker_id
+}
+```
+
+### 7.4 Operations on Views
+
+| Operation | Behaviour |
+|-----------|-----------|
+| `@s.view(perspective)` | Create view handle with given perspective |
+| `view.push(val)` | Push according to view's perspective |
+| `view.pop:var` | Pop according to view's perspective (blocking) |
+| `view.try_pop:var` | Non-blocking pop, returns bool |
+| `view.take:var` | Blocking pop (alias) |
+| `view.take(timeout):var` | Pop with timeout |
+| `view.len` | Current length (snapshot) |
+| `view.perspective` | Get current perspective |
+
+### 7.5 Semantics
+
+**Perspective determines interpretation, not storage:**
+- LIFO: `push` adds to top, `pop` removes from top
+- FIFO: `push` adds to back, `pop` removes from front
+- The underlying storage is always a deque; perspective determines which end you access
+
+**Thread safety:**
+- All view operations are thread-safe
+- Owner operations (LIFO on own queue) can be lock-free
+- Steal operations (FIFO on others' queues) use lightweight synchronisation
+- The runtime chooses the optimal implementation based on access patterns
+
+**View lifetime:**
+- Views are valid as long as the underlying stack exists
+- Multiple views can coexist on the same stack
+- Dropping a view doesn't affect the stack or other views
+
+### 7.6 Implementation
+
+The Rust runtime (`rual/src/worksteal.rs`) provides two implementations:
+
+**`WSDeque`** — Traditional Chase-Lev deque:
+- Lock-free owner push/pop
+- Atomic steal protocol
+- Fixed capacity (can be extended)
+
+**`WSStack`** — ual-native work-stealing using Stack + Views:
+- Uses `parking_lot::Mutex` for synchronisation  
+- Leverages existing Stack infrastructure
+- More flexible, slightly higher overhead
+
+The compiler should select the appropriate implementation based on usage patterns:
+- Static work-stealing pool → `WSDeque`
+- Dynamic/ad-hoc stealing → `WSStack`
+
+### 7.7 Syntax Summary
+
+```ual
+-- Create stack and views
+@work = stack.new(Task)
+owner = @work.view(LIFO)
+thief = @work.view(FIFO)
+
+-- Non-blocking operations
+if (owner.try_pop:task) { ... }
+if (thief.try_pop:stolen) { ... }
+
+-- Blocking operations
+owner.take:task
+thief.take(1000):stolen    -- 1 second timeout
+
+-- Check state
+if (owner.len > 0) { ... }
+```
+
+---
+
+## 8. Implementation Priority
 
 ### Phase 1: Error Stack Architecture
 1. Add unhandled error check to runtime Stack methods
@@ -684,9 +855,17 @@ No separate primitive needed.
 2. Options-as-hash-stacks for all operations
 3. Clean up parameter passing conventions
 
+### Phase 6: Work-Stealing and Views
+1. Add `@s.view(perspective)` syntax to parser
+2. Add `View` type to AST and type system
+3. Implement `try_pop` non-blocking operation
+4. Wire up `WSDeque` and `WSStack` from rual to codegen
+5. Add Go runtime equivalents (`pkg/runtime/worksteal.go`)
+6. Test: single-owner LIFO, multi-thief FIFO, mixed workloads
+
 ---
 
-## 8. Testing Strategy
+## 9. Testing Strategy
 
 ### Unit Tests
 
@@ -715,6 +894,15 @@ No separate primitive needed.
 - Server accepts connections
 - Network errors push to @error
 - Select across multiple sockets works
+
+**Work-stealing:**
+- View creation returns valid handle
+- LIFO view push/pop works correctly
+- FIFO view accesses opposite end
+- try_pop returns false when empty
+- Multiple views on same stack are coherent
+- Concurrent owner/thief access is safe
+- Stress test: no lost or duplicated items under contention
 
 ### Integration Tests
 
@@ -748,9 +936,45 @@ file.sink("output.txt", @output)
 )
 ```
 
+**Work-stealing pool:**
+```ual
+-- Create work queues for 4 workers
+@q0 = stack.new(i64)
+@q1 = stack.new(i64)
+@q2 = stack.new(i64)
+@q3 = stack.new(i64)
+
+@results = stack.new(i64)
+@done = stack.new(i64)
+
+-- Worker 0: owns q0, steals from q1,q2,q3
+@spawn < {
+    var own = @q0.view(LIFO)
+    var victims = [@q1.view(FIFO), @q2.view(FIFO), @q3.view(FIFO)]
+    
+    while (running) {
+        var task i64 = 0
+        if (own.try_pop:task) {
+            @results < (task * task)
+        } else {
+            -- Try stealing
+            for v in victims {
+                if (v.try_pop:task) {
+                    @results < (task * task)
+                    break
+                }
+            }
+        }
+    }
+    @done < 1
+}
+
+-- ... workers 1, 2, 3 similarly ...
+```
+
 ---
 
-## 9. Open Questions
+## 10. Open Questions
 
 1. **Stack set syntax:** Is `@{a, b, c}` the right spelling? Alternatives: `@[a, b, c]`, `expect(a, b, c)` without grouping.
 
@@ -762,19 +986,24 @@ file.sink("output.txt", @output)
 
 5. **Error stack scope:** Global `@error` or per-goroutine? Global is simpler but may cause confusion in concurrent code. Per-goroutine matches Go's error handling locality.
 
+6. **View syntax:** Should `@s.view(LIFO)` return a new type (`View`) or just a configured reference to the stack? If a new type, how do views interact with generic stack operations?
+
+7. **Work-stealing selection:** When a thief has multiple potential victims, what order should it try? Random (avoid contention), round-robin (fairness), or nearest-neighbour (cache locality)?
+
 ---
 
-## 10. References
+## 11. References
 
-- UAL v0.7.3 compiler: `../cmd/ual/` (lexer, parser, codegen, main)
-- UAL v0.7.3 interpreter: `../cmd/iual/` (interp, interp_control, interp_expr)
+- ual v0.7.4 compiler: `../cmd/ual/` (lexer, parser, codegen_go, codegen_rust, main)
+- ual v0.7.4 interpreter: `../cmd/iual/` (interp, interp_control, interp_expr)
+- ual v0.7.4 Rust runtime: `../rual/` (stack, value, view, sync, worksteal)
 - Shared packages: `../pkg/ast/`, `../pkg/lexer/`, `../pkg/parser/`, `../pkg/runtime/`, `../pkg/version/`
 - Runtime: `../pkg/runtime/` (Stack, Value, ValueStack, ScopeStack, View, Bring, Walk)
-- Existing constructs: `MANUAL.md`, `COMPUTE_SPEC_V2.md`
-- Examples: `../examples/` directory (71 programs)
-- Benchmarks: `../benchmarks/` directory
+- Existing constructs: `MANUAL.md`, `COMPUTE_SPEC_V2.md`, `CONCURRENCY.md`
+- Examples: `../examples/` directory (92 programs)
+- Benchmarks: `../tests/benchmarks/` directory
 
-**Implementation Note (v0.7.3):** As of v0.7.3, the interpreter has achieved parity with the compiler. Both use `pkg/runtime` types and execute spawned tasks as goroutines. All 71 example tests pass in both tools. This provides a foundation for implementing v0.8 features in both tools simultaneously.
+**Implementation Note (v0.7.4):** As of v0.7.4, all three execution modes (Go compiler, Rust compiler, iual interpreter) have achieved 100% parity. All 92 example tests pass identically across all three implementations. The Rust backend is production-ready. This provides a solid foundation for implementing v0.8 features across all execution modes simultaneously.
 
 ---
 

@@ -1,0 +1,65 @@
+-- 079: Bounded Buffer Producer-Consumer
+-- Producer blocks when buffer full, consumer blocks when empty
+--
+-- Note: Spawned tasks use private @dstack/@rstack (per-goroutine)
+-- while @buffer, @slots, @items are shared for coordination.
+
+@buffer = stack.new(i64)
+@buffer perspective(FIFO)
+
+@slots = stack.new(i64)  -- Available slots (semaphore for space)
+@items = stack.new(i64)  -- Available items (semaphore for items)
+
+@results = stack.new(i64)
+@done = stack.new(i64)
+
+-- Initialize: 3 empty slots
+@slots < 1
+@slots < 1
+@slots < 1
+
+-- Producer: produces 6 items (will block when buffer full)
+@spawn < {
+    var i i64 = 1
+    while (i <= 6) {
+        var slot i64 = 0
+        @slots take:slot     -- wait for empty slot
+        @buffer < (i * 10)   -- produce item
+        @items < 1           -- signal item available
+        push:i inc let:i
+    }
+    @done < 1
+}
+
+-- Consumer: consumes 6 items
+@spawn < {
+    var sum i64 = 0
+    var count i64 = 0
+    while (count < 6) {
+        var item_signal i64 = 0
+        @items take:item_signal  -- wait for item
+        var val i64 = 0
+        @buffer take:val         -- consume item
+        @slots < 1               -- signal slot freed
+        push:(sum + val) let:sum
+        push:count inc let:count
+    }
+    @results < sum
+    @done < 1
+}
+
+-- Start both
+@spawn pop play pop play
+
+-- Wait for both
+var d1 i64 = 0
+var d2 i64 = 0
+@done take:d1
+@done take:d2
+
+-- Get result
+var total i64 = 0
+@results take:total
+
+-- Expected: 10 + 20 + 30 + 40 + 50 + 60 = 210
+push:total dot

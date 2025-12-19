@@ -1,0 +1,20 @@
+-- bench_memory_large_stack.ual
+-- Benchmark: Large stack allocation (10000 values)
+
+@data = stack.new(i64)
+
+-- Fill stack with 10000 values
+var limit i64 = 10000
+var i i64 = 0
+while (i < limit) {
+    @data push:i
+    push:i inc let:i
+}
+
+-- Pop all and sum
+var sum i64 = 0
+@data for{|v|
+    push:(sum + v) let:sum
+}
+
+push:sum dot

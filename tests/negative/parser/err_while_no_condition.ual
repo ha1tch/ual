@@ -1,0 +1,5 @@
+-- Parser error test: while missing condition
+@stack = stack.new(i64)
+while {
+    @stack push(1)
+}

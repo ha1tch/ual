@@ -1,4 +1,4 @@
--- 41: Blocking select - waits until data arrives
+-- 032: Blocking select - waits until data arrives
 -- Demonstrates blocking .select() without default case
 
 @inbox = stack.new(i64)

@@ -1,0 +1,134 @@
+-- 083: Load Balancer
+-- Distribute requests across multiple backend workers
+-- Round-robin assignment with result aggregation
+
+@requests = stack.new(i64)
+@requests perspective(FIFO)
+@backend1 = stack.new(i64)
+@backend1 perspective(FIFO)
+@backend2 = stack.new(i64)
+@backend2 perspective(FIFO)
+@backend3 = stack.new(i64)
+@backend3 perspective(FIFO)
+@results = stack.new(i64)
+@done = stack.new(i64)
+
+-- Backend 1: multiplies by 2
+@spawn < {
+    var running i64 = 1
+    while (running == 1) {
+        var req i64 = 0
+        @backend1 take:req
+        if (req == 0) {
+            push:0 let:running
+        } else {
+            @results < (req * 2)
+        }
+    }
+    @done < 1
+}
+
+-- Backend 2: multiplies by 3
+@spawn < {
+    var running i64 = 1
+    while (running == 1) {
+        var req i64 = 0
+        @backend2 take:req
+        if (req == 0) {
+            push:0 let:running
+        } else {
+            @results < (req * 3)
+        }
+    }
+    @done < 1
+}
+
+-- Backend 3: multiplies by 4
+@spawn < {
+    var running i64 = 1
+    while (running == 1) {
+        var req i64 = 0
+        @backend3 take:req
+        if (req == 0) {
+            push:0 let:running
+        } else {
+            @results < (req * 4)
+        }
+    }
+    @done < 1
+}
+
+-- Load balancer: round-robin distribution
+@spawn < {
+    var running i64 = 1
+    var robin i64 = 0
+    while (running == 1) {
+        var req i64 = 0
+        @requests take:req
+        if (req == 0) {
+            push:0 let:running
+        } else {
+            -- Round-robin dispatch
+            if (robin == 0) {
+                @backend1 < req
+            } elseif (robin == 1) {
+                @backend2 < req
+            } else {
+                @backend3 < req
+            }
+            -- Advance robin: 0 -> 1 -> 2 -> 0
+            push:(robin + 1) let:robin
+            if (robin >= 3) {
+                push:0 let:robin
+            }
+        }
+    }
+    -- Signal backends to stop
+    @backend1 < 0
+    @backend2 < 0
+    @backend3 < 0
+    @done < 1
+}
+
+-- Submit requests FIRST: 10, 20, 30, 40, 50, 60, then sentinel
+-- Backend 1 gets: 10, 40 -> produces 20, 80
+-- Backend 2 gets: 20, 50 -> produces 60, 150
+-- Backend 3 gets: 30, 60 -> produces 120, 240
+@requests < 10
+@requests < 20
+@requests < 30
+@requests < 40
+@requests < 50
+@requests < 60
+@requests < 0
+
+-- Start all workers (balancer + 3 backends)
+@spawn pop play pop play pop play pop play
+
+-- Wait for all to complete
+var d1 i64 = 0
+var d2 i64 = 0
+var d3 i64 = 0
+var d4 i64 = 0
+@done take:d1
+@done take:d2
+@done take:d3
+@done take:d4
+
+-- Collect results: 20 + 60 + 120 + 80 + 150 + 240 = 670
+var sum i64 = 0
+var r1 i64 = 0
+var r2 i64 = 0
+var r3 i64 = 0
+var r4 i64 = 0
+var r5 i64 = 0
+var r6 i64 = 0
+@results take:r1
+@results take:r2
+@results take:r3
+@results take:r4
+@results take:r5
+@results take:r6
+push:(r1 + r2 + r3 + r4 + r5 + r6) let:sum
+
+push:sum dot

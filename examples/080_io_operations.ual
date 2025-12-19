@@ -1,0 +1,55 @@
+-- 080: I/O Operations
+-- Demonstrates print, println, emit, and dot
+-- 
+-- Rule: print = no newline, println = newline (all forms)
+
+-- emit: output single character (no newline)
+emit:72 emit:101 emit:108 emit:108 emit:111  -- Hello
+emit:10  -- newline
+
+-- print: ALL forms have NO newline
+print:1
+print:2
+print(3)
+print(4, 5)
+emit:10  -- need explicit newline
+
+-- println: ALL forms have newline
+println:6
+println(7)
+println(8, 9)
+
+-- Stack forms
+push:65 emit      -- A
+push:66 emit      -- B  
+push:67 emit      -- C
+emit:10           -- newline
+
+-- dot: Forth-style (like println stack form)
+push:123
+dot
+
+-- print stack form: pop without newline
+push:456
+print
+emit:10
+
+-- println stack form: pop with newline  
+push:789
+println
+
+-- Multiple values
+println("Sum:", 10, "+", 20, "=", 30)
+
+-- Build output character by character (using print)
+var i i64 = 0
+var ch i64 = 0
+while (i < 10) {
+    push:(48 + i) let:ch  -- '0' is ASCII 48
+    emit:ch
+    push:i inc let:i
+}
+emit:10
+
+-- Done
+println:"Done"

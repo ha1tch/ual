@@ -1,4 +1,4 @@
--- 21: take with timeout to variable
+-- 021: take with timeout to variable
 
 @data = stack.new(i64)
 @data < 42

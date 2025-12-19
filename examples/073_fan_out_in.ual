@@ -1,0 +1,57 @@
+-- 073: Fan-out/Fan-in Pattern
+-- Distribute work to multiple workers, collect results
+
+@work = stack.new(i64)
+@results = stack.new(i64)
+@done = stack.new(i64)
+
+-- Push work FIRST (before starting workers)
+@work < 2
+@work < 3
+@work < 4
+
+-- Worker 1
+@spawn < {
+    var n i64 = 0
+    @work take:n
+    @results < (n * n)
+    @done < 1
+}
+
+-- Worker 2
+@spawn < {
+    var n i64 = 0
+    @work take:n
+    @results < (n * n)
+    @done < 1
+}
+
+-- Worker 3
+@spawn < {
+    var n i64 = 0
+    @work take:n
+    @results < (n * n)
+    @done < 1
+}
+
+-- Start all workers
+@spawn pop play pop play pop play
+
+-- Wait for all workers
+var w1 i64 = 0
+var w2 i64 = 0
+var w3 i64 = 0
+@done take:w1
+@done take:w2
+@done take:w3
+
+-- Collect results and sum
+var r1 i64 = 0
+var r2 i64 = 0
+var r3 i64 = 0
+@results take:r1
+@results take:r2
+@results take:r3
+
+-- Expected: 4 + 9 + 16 = 29
+push:(r1 + r2 + r3) dot

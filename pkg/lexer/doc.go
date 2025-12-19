@@ -1,6 +1,6 @@
-// Package lexer provides tokenisation for UAL source code.
+// Package lexer provides tokenisation for ual source code.
 //
-// The lexer breaks UAL source into tokens that can be consumed by the parser.
+// The lexer breaks ual source into tokens that can be consumed by the parser.
 // It handles:
 //   - Keywords (func, var, if, while, for, etc.)
 //   - Stack operations (push, pop, peek, dup, swap, etc.)

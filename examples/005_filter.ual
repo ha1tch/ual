@@ -1,4 +1,4 @@
--- 05: Filter - Copy elements > threshold to new stack
+-- 005: Filter - Copy elements > threshold to new stack
 
 @source = stack.new(i64)
 

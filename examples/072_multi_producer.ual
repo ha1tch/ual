@@ -1,0 +1,55 @@
+-- 072: Multiple Producers, Single Consumer
+-- Three producers push values, consumer collects and sums them
+
+@queue = stack.new(i64)
+@queue perspective(FIFO)
+
+@done = stack.new(i64)
+
+-- Producer 1: pushes 1, 2, 3
+@spawn < {
+    @queue < 1
+    @queue < 2
+    @queue < 3
+    @done < 1
+}
+
+-- Producer 2: pushes 10, 20, 30
+@spawn < {
+    @queue < 10
+    @queue < 20
+    @queue < 30
+    @done < 1
+}
+
+-- Producer 3: pushes 100, 200, 300
+@spawn < {
+    @queue < 100
+    @queue < 200
+    @queue < 300
+    @done < 1
+}
+
+-- Start all producers
+@spawn pop play pop play pop play
+
+-- Wait for all producers to finish
+var d1 i64 = 0
+var d2 i64 = 0
+var d3 i64 = 0
+@done take:d1
+@done take:d2
+@done take:d3
+
+-- Now consume all 9 values and sum them
+var sum i64 = 0
+var count i64 = 0
+while (count < 9) {
+    var val i64 = 0
+    @queue take:val
+    push:(sum + val) let:sum
+    push:count inc let:count
+}
+
+-- Expected: 1+2+3+10+20+30+100+200+300 = 666
+push:sum dot

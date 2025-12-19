@@ -38,6 +38,7 @@ var (
 type Interpreter struct {
 	funcs      map[string]*ast.FuncDecl // user-defined functions
 	stacks     map[string]*ValueStack   // named stacks
+	stackTypes map[string]string        // element types for each stack
 	views      map[string]*View         // named views
 	vars       *ScopeStack              // variable scopes
 	returnVal  Value                    // return value from last return statement
@@ -57,6 +58,13 @@ type Interpreter struct {
 	
 	// For compute blocks (self reference)
 	computeStack *ValueStack
+	
+	// Fast-path local variables for compute blocks (avoids scope walking)
+	localVars    map[string]Value
+	inComputeBlock bool
+	
+	// Compiled compute block cache (threaded code)
+	compiledCompute map[*ast.ComputeStmt]*CompiledCompute
 	
 	// For auto-print of top-level assigned variables
 	topLevelVars []string
@@ -87,19 +95,25 @@ func perspectiveFromString(s string) runtime.Perspective {
 // NewInterpreter creates a new interpreter.
 func NewInterpreter() *Interpreter {
 	interp := &Interpreter{
-		funcs:  make(map[string]*ast.FuncDecl),
-		stacks: make(map[string]*ValueStack),
-		views:  make(map[string]*View),
-		vars:   runtime.NewScopeStack(),
+		funcs:           make(map[string]*ast.FuncDecl),
+		stacks:          make(map[string]*ValueStack),
+		stackTypes:      make(map[string]string),
+		views:           make(map[string]*View),
+		vars:            runtime.NewScopeStack(),
+		compiledCompute: make(map[*ast.ComputeStmt]*CompiledCompute),
 	}
 	
 	// Create default stacks
 	interp.stacks["dstack"] = runtime.NewValueStack(runtime.LIFO)
+	interp.stackTypes["dstack"] = "i64"
 	interp.stacks["error"] = runtime.NewValueStack(runtime.LIFO)
+	interp.stackTypes["error"] = "string"
 	interp.stacks["rstack"] = runtime.NewValueStack(runtime.LIFO)
+	interp.stackTypes["rstack"] = "i64"
 	interp.stacks["spawn"] = runtime.NewValueStack(runtime.FIFO)
 	interp.stacks["defer"] = runtime.NewValueStack(runtime.LIFO)
 	interp.stacks["bool"] = runtime.NewValueStack(runtime.LIFO)
+	interp.stackTypes["bool"] = "bool"
 	
 	return interp
 }
@@ -262,9 +276,12 @@ func (i *Interpreter) execBlock(stmts []ast.Stmt) error {
 
 // execStackDecl creates a new stack.
 func (i *Interpreter) execStackDecl(s *ast.StackDecl) error {
-	// Skip if stack already exists (matches compiler behavior for globals)
-	if _, exists := i.stacks[s.Name]; exists {
-		return nil
+	// For local stacks, always create (allows shadowing global stacks in spawn)
+	// For global stacks, skip if already exists (matches compiler behavior)
+	if !s.Local {
+		if _, exists := i.stacks[s.Name]; exists {
+			return nil
+		}
 	}
 	
 	persp := s.Perspective
@@ -277,6 +294,14 @@ func (i *Interpreter) execStackDecl(s *ast.StackDecl) error {
 	} else {
 		i.stacks[s.Name] = runtime.NewValueStack(perspectiveFromString(persp))
 	}
+	
+	// Track element type
+	elemType := s.ElementType
+	if elemType == "" {
+		elemType = "i64"
+	}
+	i.stackTypes[s.Name] = elemType
+	
 	return nil
 }
 
@@ -294,9 +319,6 @@ func (i *Interpreter) execViewDecl(s *ast.ViewDecl) error {
 // execVarDecl declares variables.
 func (i *Interpreter) execVarDecl(s *ast.VarDecl) error {
 	for idx, name := range s.Names {
-		// Check if variable already exists in current scope
-		_, exists := i.vars.Get(name)
-		
 		var val Value
 		hasValue := idx < len(s.Values) && s.Values[idx] != nil
 		
@@ -306,17 +328,7 @@ func (i *Interpreter) execVarDecl(s *ast.VarDecl) error {
 				return err
 			}
 			val = v
-			
-			// Skip if variable already exists (let:x ... var x = 0 pattern)
-			// This handles the case where let:x sets the value before var declares it
-			if exists {
-				continue
-			}
 		} else {
-			// No value provided - skip if exists
-			if exists {
-				continue
-			}
 			// Zero value based on type
 			switch s.Type {
 			case "i64", "i32", "i16", "i8", "u64", "u32", "u16", "u8":
@@ -331,7 +343,14 @@ func (i *Interpreter) execVarDecl(s *ast.VarDecl) error {
 				val = NilValue
 			}
 		}
-		i.vars.Set(name, val)
+		
+		// Fast path: use local vars cache in compute blocks
+		if i.inComputeBlock && i.localVars != nil {
+			i.localVars[name] = val
+		} else {
+			// Always set/update the variable (var x = value means set x to value)
+			i.vars.SetOrUpdate(name, val)
+		}
 	}
 	return nil
 }
@@ -352,6 +371,14 @@ func (i *Interpreter) execAssignStmt(s *ast.AssignStmt) error {
 	val, err := i.evalExpr(s.Value)
 	if err != nil {
 		return err
+	}
+	
+	// Fast path: use local vars cache in compute blocks
+	if i.inComputeBlock && i.localVars != nil {
+		if _, exists := i.localVars[s.Name]; exists {
+			i.localVars[s.Name] = val
+			return nil
+		}
 	}
 	
 	// Try to update existing variable first
@@ -420,6 +447,102 @@ func (i *Interpreter) execLetAssign(s *ast.LetAssign) error {
 	return nil
 }
 
+// valueTypeToString converts a ValueType to its string representation
+func valueTypeToString(vt runtime.ValueType) string {
+	switch vt {
+	case runtime.VTInt:
+		return "i64"
+	case runtime.VTFloat:
+		return "f64"
+	case runtime.VTString:
+		return "string"
+	case runtime.VTBool:
+		return "bool"
+	default:
+		return "unknown"
+	}
+}
+
+// isTypeCompatibleIual checks if srcType can be stored in a stack of dstType
+// This is used for push operations where numeric literals adapt to target type
+func isTypeCompatibleIual(srcType, dstType string) bool {
+	if srcType == dstType {
+		return true
+	}
+	// i64 → f64: allowed (promotion for push)
+	if srcType == "i64" && dstType == "f64" {
+		return true
+	}
+	// bool → i64: allowed
+	if srcType == "bool" && dstType == "i64" {
+		return true
+	}
+	// Everything else: not compatible
+	return false
+}
+
+// isStrictTypeMatch checks if types match exactly (for let/pop operations)
+// Only bring() can convert between types
+func isStrictTypeMatch(srcType, dstType string) bool {
+	return srcType == dstType
+}
+
+// convertValueForStack converts a value to match the target stack type
+func convertValueForStack(val Value, dstType string) Value {
+	srcType := valueTypeToString(val.Type)
+	if srcType == dstType {
+		return val
+	}
+	// i64 → f64
+	if srcType == "i64" && dstType == "f64" {
+		return NewFloat(float64(val.AsInt()))
+	}
+	// bool → i64
+	if srcType == "bool" && dstType == "i64" {
+		if val.AsBool() {
+			return NewInt(1)
+		}
+		return NewInt(0)
+	}
+	return val
+}
+
+// canConvertTypes checks if srcType can be converted to dstType via bring()
+func canConvertTypes(srcType, dstType string) bool {
+	if srcType == dstType {
+		return true
+	}
+	// Numeric conversions are allowed
+	numericTypes := map[string]bool{"i64": true, "f64": true, "bool": true}
+	if numericTypes[srcType] && numericTypes[dstType] {
+		return true
+	}
+	// String conversions are not allowed (too risky)
+	return false
+}
+
+// convertValueToType converts a value to the target type (for bring)
+func convertValueToType(val Value, dstType string) Value {
+	srcType := valueTypeToString(val.Type)
+	if srcType == dstType {
+		return val
+	}
+	switch dstType {
+	case "i64":
+		// f64 → i64: truncate
+		// bool → i64: 0/1
+		return NewInt(val.AsInt())
+	case "f64":
+		// i64 → f64: promote
+		// bool → f64: 0.0/1.0
+		return NewFloat(val.AsFloat())
+	case "bool":
+		// numeric → bool: non-zero = true
+		return NewBool(val.AsBool())
+	}
+	return val
+}
+
 // execStackOp executes a stack operation.
 func (i *Interpreter) execStackOp(s *ast.StackOp) error {
 	stack, ok := i.stacks[s.Stack]
@@ -429,38 +552,74 @@ func (i *Interpreter) execStackOp(s *ast.StackOp) error {
 	
 	switch s.Op {
 	case "push":
+		// Get stack's declared element type
+		elemType := i.stackTypes[s.Stack]
+		
 		for _, arg := range s.Args {
 			val, err := i.evalExpr(arg)
 			if err != nil {
 				return err
 			}
+			
+			// Check type compatibility
+			if elemType != "" {
+				valType := valueTypeToString(val.Type)
+				if !isTypeCompatibleIual(valType, elemType) {
+					return fmt.Errorf("cannot push %s value to @%s (%s stack)", valType, s.Stack, elemType)
+				}
+				// Convert if needed (e.g., int → float)
+				val = convertValueForStack(val, elemType)
+			}
+			
 			if err := stack.Push(val); err != nil {
 				return err
 			}
 		}
 	case "pop":
-		val, err := stack.Pop()
-		if err != nil {
-			// Empty stack - use zero value like compiled version
-			val = NewInt(0)
-		}
 		if s.Target != "" {
-			// Use Update to modify existing variable, fall back to Set for new
-			if !i.vars.Update(s.Target, val) {
-				i.vars.Set(s.Target, val)
+			// pop:var — direct assignment to variable
+			// Variable must be explicitly declared
+			if !i.vars.Has(s.Target) {
+				return fmt.Errorf("cannot pop to undeclared variable '%s'; use 'var %s type = value' first", s.Target, s.Target)
 			}
+			
+			// Check type compatibility - must be exact match
+			stackElemType := i.stackTypes[s.Stack]
+			if stackElemType == "" {
+				stackElemType = "i64" // dstack default
+			}
+			existingVal, _ := i.vars.Get(s.Target)
+			varType := valueTypeToString(existingVal.Type)
+			if !isStrictTypeMatch(stackElemType, varType) {
+				return fmt.Errorf("cannot pop from @%s (%s) to variable '%s' (%s); types must match exactly (use bring() for conversion)",
+					s.Stack, stackElemType, s.Target, varType)
+			}
+			
+			val, err := stack.Pop()
+			if err != nil {
+				// Empty stack - use zero value like compiled version
+				val = NewInt(0)
+			}
+			i.vars.Update(s.Target, val)
 		} else if s.Stack != "dstack" {
 			// Forth model: pop from named stack pushes to dstack
+			val, err := stack.Pop()
+			if err != nil {
+				val = NewInt(0)
+			}
+			// Check type compatibility - only i64 can be pushed to dstack
+			elemType := i.stackTypes[s.Stack]
+			if elemType != "" && elemType != "i64" {
+				return fmt.Errorf("cannot pop from @%s (%s) to @dstack without target variable; use '@%s pop:varname' or '@%s dot'",
+					s.Stack, elemType, s.Stack, s.Stack)
+			}
 			i.stacks["dstack"].Push(val)
+		} else {
+			// Pop from dstack and discard
+			_, _ = stack.Pop()
 		}
-		// If popping from dstack with no target, value is discarded
 	case "let":
 		// let:name - pop from stack and assign to variable
-		val, err := stack.Pop()
-		if err != nil {
-			// Empty stack - use zero value
-			val = NewInt(0)
-		}
 		// Variable name comes from Args[0] as an Ident
 		var varName string
 		if len(s.Args) > 0 {
@@ -470,13 +629,35 @@ func (i *Interpreter) execStackOp(s *ast.StackOp) error {
 		} else if s.Target != "" {
 			varName = s.Target
 		}
-		if varName != "" {
-			// Try to update existing variable first (for outer scopes)
-			if !i.vars.Update(varName, val) {
-				// Otherwise create new in current scope
-				i.vars.Set(varName, val)
-			}
+		if varName == "" {
+			return fmt.Errorf("let requires a variable name")
 		}
+		
+		// Variable must be explicitly declared
+		if !i.vars.Has(varName) {
+			return fmt.Errorf("cannot let to undeclared variable '%s'; use 'var %s type = value' first", varName, varName)
+		}
+		
+		val, err := stack.Pop()
+		if err != nil {
+			// Empty stack - use zero value
+			val = NewInt(0)
+		}
+		
+		// Check type compatibility - must be exact match (use bring() for conversion)
+		stackElemType := i.stackTypes[s.Stack]
+		if stackElemType == "" {
+			stackElemType = "i64" // dstack default
+		}
+		existingVal, _ := i.vars.Get(varName)
+		varType := valueTypeToString(existingVal.Type)
+		if !isStrictTypeMatch(stackElemType, varType) {
+			return fmt.Errorf("cannot let from @%s (%s) to variable '%s' (%s); types must match exactly (use bring() for conversion)",
+				s.Stack, stackElemType, varName, varType)
+		}
+		
+		// Update existing variable
+		i.vars.Update(varName, val)
 	case "peek":
 		val, err := stack.Peek()
 		if err != nil {
@@ -549,8 +730,30 @@ func (i *Interpreter) execStackOp(s *ast.StackOp) error {
 			i.stacks["dstack"].Push(val)
 		}
 	case "print":
+		// print: always no newline (all forms)
 		if len(s.Args) > 0 {
-			// print(args) - print the arguments
+			// print:X or print(args) - no newline
+			for idx, arg := range s.Args {
+				val, err := i.evalExpr(arg)
+				if err != nil {
+					return err
+				}
+				if idx > 0 {
+					fmt.Print(" ")
+				}
+				fmt.Print(val.AsString())
+			}
+		} else {
+			// print - Forth-style: pop and print without newline
+			val, err := stack.Pop()
+			if err != nil {
+				return err
+			}
+			fmt.Print(val.AsString())
+		}
+	case "println":
+		if len(s.Args) > 0 {
+			// println(args) or println:X - print with newline
 			for idx, arg := range s.Args {
 				val, err := i.evalExpr(arg)
 				if err != nil {
@@ -563,15 +766,31 @@ func (i *Interpreter) execStackOp(s *ast.StackOp) error {
 			}
 			fmt.Println()
 		} else {
-			// print() - Forth-style: peek and print top of stack
-			val, err := stack.Peek()
+			// println - Forth-style: pop and print with newline
+			val, err := stack.Pop()
 			if err != nil {
 				return err
 			}
 			fmt.Println(val.AsString())
 		}
+	case "emit":
+		if len(s.Args) > 0 {
+			// emit:X - print char from value without newline
+			val, err := i.evalExpr(s.Args[0])
+			if err != nil {
+				return err
+			}
+			fmt.Print(string(rune(val.AsInt())))
+		} else {
+			// emit - Forth-style: pop and print as char without newline
+			val, err := stack.Pop()
+			if err != nil {
+				return err
+			}
+			fmt.Print(string(rune(val.AsInt())))
+		}
 	case "dot":
-		// Forth-style: pop and print
+		// Forth-style: pop and print with newline
 		val, err := stack.Pop()
 		if err != nil {
 			return err
@@ -616,7 +835,7 @@ func (i *Interpreter) execStackOp(s *ast.StackOp) error {
 		hasElements := stack.Len() > 0
 		return i.stacks["bool"].Push(NewBool(hasElements))
 	case "bring":
-		// bring(@source) - transfer top element from source to dest
+		// bring(@source) - transfer top element from source to dest with type conversion
 		if len(s.Args) < 1 {
 			return fmt.Errorf("bring requires source stack argument")
 		}
@@ -626,11 +845,29 @@ func (i *Interpreter) execStackOp(s *ast.StackOp) error {
 			if !ok {
 				return fmt.Errorf("undefined stack: @%s", ref.Name)
 			}
-			// Pop from source and push to destination
+			
+			// Get type information
+			srcType := i.stackTypes[ref.Name]
+			dstType := i.stackTypes[s.Stack]
+			
+			// Pop from source
 			val, err := srcStack.Pop()
 			if err != nil {
 				val = NewInt(0)
 			}
+			
+			// Convert value to destination type
+			if srcType != "" && dstType != "" && srcType != dstType {
+				// Check if conversion is possible
+				if !canConvertTypes(srcType, dstType) {
+					// Push back to source (atomic - restore on failure)
+					srcStack.Push(val)
+					return fmt.Errorf("cannot bring %s value from @%s to @%s (%s stack)",
+						srcType, ref.Name, s.Stack, dstType)
+				}
+				val = convertValueToType(val, dstType)
+			}
+			
 			return stack.Push(val)
 		}
 	case "freeze":

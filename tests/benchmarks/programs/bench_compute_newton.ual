@@ -1,0 +1,29 @@
+-- bench_compute_newton.ual
+-- Benchmark: Newton-Raphson square root (1000 values)
+
+@result = stack.new(f64)
+
+@result push(1000.0)
+
+@result {
+}.compute({|limit|
+    var sum = 0.0
+    var n = 1.0
+    
+    while (n <= limit) {
+        var guess = n / 2.0
+        var i = 0.0
+        
+        while (i < 20.0) {
+            guess = (guess + (n / guess)) / 2.0
+            i = i + 1.0
+        }
+        
+        sum = sum + guess
+        n = n + 1.0
+    }
+    
+    return sum
+})
+
+@result dot

@@ -1,0 +1,3 @@
+ownerTask = 5
+thiefTask = 1
+sum = 60

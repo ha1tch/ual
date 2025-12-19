@@ -1,7 +1,9 @@
--- 19: @stack take with timeout
+-- 019: @stack take with timeout
 -- Demonstrates take with timeout for non-blocking wait
 
 @results = stack.new(i64)
+
+var result i64 = 0
 
 -- Try to take with short timeout (nothing there yet)
 push:1 dot

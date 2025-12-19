@@ -72,7 +72,14 @@ func (i *Interpreter) evalIdent(e *ast.Ident) (Value, error) {
 		return NilValue, nil
 	}
 	
-	// Look up variable
+	// Fast path: check local vars cache first (for compute blocks)
+	if i.inComputeBlock && i.localVars != nil {
+		if val, ok := i.localVars[e.Name]; ok {
+			return val, nil
+		}
+	}
+	
+	// Look up variable in scope stack
 	if val, ok := i.vars.Get(e.Name); ok {
 		return val, nil
 	}

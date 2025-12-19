@@ -18,11 +18,13 @@ var a, b i64 = 100, 200
 push:a dot           -- 100
 push:b dot           -- 200
 
--- let assigns @dstack result to variable
+-- let assigns @dstack result to existing variable
+var z i64 = 0
 push:5 push:7 mul let:z
 push:z dot           -- 35
 
 -- Chained computation
+var sum i64 = 0
 push:x push:y add let:sum
 push:sum dot         -- 52
 

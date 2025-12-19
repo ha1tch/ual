@@ -1,0 +1,21 @@
+-- bench_stack_push_pop.ual
+-- Benchmark: Stack push/pop throughput (10000 ops)
+
+@data = stack.new(i64)
+
+-- Push 10000 values
+var limit i64 = 10000
+var i i64 = 0
+while (i < limit) {
+    @data push:i
+    push:i inc let:i
+}
+
+-- Pop and sum using for loop
+var sum i64 = 0
+@data for{|v|
+    push:(sum + v) let:sum
+}
+
+-- Output sum (0+1+...+9999 = 49995000)
+push:sum dot

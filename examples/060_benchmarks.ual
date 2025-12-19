@@ -74,14 +74,14 @@ push:sumFifo dot   -- 499500
 -- Benchmark 4: Function call overhead
 ------------------------------------------------------------
 func addOne(x i64) i64 {
-    push:x push:1 add let:r
     var r i64 = 0
+    push:x push:1 add let:r
     return r
 }
 
 func addTen(x i64) i64 {
-    push:x push:10 add let:r
     var r i64 = 0
+    push:x push:10 add let:r
     return r
 }
 
@@ -140,9 +140,9 @@ while (b8 < 100) {
 
 -- Filter evens
 @evens = stack.new(i64)
+var rem i64 = 0
 @source for{|v|
     push:v push:2 mod let:rem
-    var rem i64 = 0
     if (rem == 0) {
         @evens push:v
     }
@@ -217,9 +217,9 @@ while (t < 500) {
 -- Owner consumes from top (LIFO)
 var ownerWork i64 = 0
 var ow i64 = 0
+var task i64 = 0
 while (ow < 100) {
     @tasks pop let:task
-    var task i64 = 0
     push:ownerWork push:task add let:ownerWork
     push:ow inc let:ow
 }

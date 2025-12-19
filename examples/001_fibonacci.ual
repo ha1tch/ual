@@ -1,4 +1,4 @@
--- 01: Fibonacci - Generate first N fibonacci numbers
+-- 001: Fibonacci - Generate first N fibonacci numbers
 
 var n i64 = 20
 var a i64 = 0
@@ -8,6 +8,7 @@ var b i64 = 1
 @fib push:a
 
 var i i64 = 1
+var temp i64 = 0
 while (i < n) {
     @fib push:b
     push:a push:b add let:temp
@@ -15,7 +16,6 @@ while (i < n) {
     push:temp let:b
     push:i inc let:i
 }
-var temp i64 = 0
 
 -- Output last value
 @fib peek dot

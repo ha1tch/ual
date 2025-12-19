@@ -1,0 +1,37 @@
+-- 075: Request-Response Pattern
+-- Main sends requests, worker responds with incremented value
+
+@request = stack.new(i64)
+@response = stack.new(i64)
+@done = stack.new(i64)
+
+-- Worker: receives value on request, sends (value+1) on response
+@spawn < {
+    var i i64 = 0
+    while (i < 10) {
+        var val i64 = 0
+        @request take:val
+        @response < (val + 1)
+        push:i inc let:i
+    }
+    @done < 1
+}
+
+-- Start worker
+@spawn pop play
+
+-- Main: send request, get response, 10 times
+var current i64 = 0
+var round i64 = 0
+while (round < 10) {
+    @request < current
+    @response take:current
+    push:round inc let:round
+}
+
+-- Wait for worker to finish
+var d i64 = 0
+@done take:d
+
+-- current should be 10 (0->1->2->...->10)
+push:current dot

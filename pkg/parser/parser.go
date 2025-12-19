@@ -83,6 +83,8 @@ func (p *Parser) parseStmt() (ast.Stmt, error) {
 		return p.parseIdentStmt()
 	case lexer.TokVar:
 		return p.parseVarDecl()
+	case lexer.TokLocal:
+		return p.parseLocalStackDecl()
 	case lexer.TokLet:
 		return p.parseLetAssign("dstack")
 	case lexer.TokIf:
@@ -483,11 +485,13 @@ func (p *Parser) parseOperation(stackName string, inBlock bool) (*ast.StackOp, e
 	
 	var args []ast.Expr
 	var target string
+	var colonForm bool
 	
 	next := p.peek()
 	
 	if next.Type == lexer.TokLParen {
 		// op(args) - parenthesized form
+		colonForm = false
 		p.advance() // consume (
 		
 		if p.peek().Type != lexer.TokRParen {
@@ -523,6 +527,7 @@ func (p *Parser) parseOperation(stackName string, inBlock bool) (*ast.StackOp, e
 		}
 	} else if next.Type == lexer.TokColon {
 		// op:arg - colon form
+		colonForm = true
 		p.advance() // consume :
 		
 		// For pop and take, the arg after : is a variable target
@@ -540,9 +545,9 @@ func (p *Parser) parseOperation(stackName string, inBlock bool) (*ast.StackOp, e
 			args = append(args, arg)
 		}
 	}
-	// else: op with no arguments
+	// else: op with no arguments (colonForm stays false)
 	
-	return &ast.StackOp{Stack: stackName, Op: op, Args: args, Target: target}, nil
+	return &ast.StackOp{Stack: stackName, Op: op, Args: args, Target: target, ColonForm: colonForm}, nil
 }
 
 func isOperationToken(t lexer.TokenType) bool {
@@ -563,7 +568,7 @@ func isOperationToken(t lexer.TokenType) bool {
 	     // Stack manipulation
 	     lexer.TokDup, lexer.TokDrop, lexer.TokSwap, lexer.TokOver, lexer.TokRot,
 	     // I/O
-	     lexer.TokPrint, lexer.TokDotOp,
+	     lexer.TokPrint, lexer.TokPrintln, lexer.TokEmit, lexer.TokDotOp,
 	     // Return stack
 	     lexer.TokToR, lexer.TokFromR,
 	     // Variables
@@ -573,6 +578,39 @@ func isOperationToken(t lexer.TokenType) bool {
 		return true
 	}
 	return false
+}
+
+// parseLocalStackDecl: local @name = stack.new(type)
+// Creates a spawn-local stack that is private to the spawned goroutine
+func (p *Parser) parseLocalStackDecl() (ast.Stmt, error) {
+	p.advance() // consume 'local'
+	
+	// Expect @name
+	stackTok, err := p.expect(lexer.TokStackRef)
+	if err != nil {
+		return nil, fmt.Errorf("line %d: expected @stackname after 'local'", p.peek().Line)
+	}
+	name := stackTok.Value
+	
+	// Expect =
+	_, err = p.expect(lexer.TokEquals)
+	if err != nil {
+		return nil, fmt.Errorf("line %d: expected '=' after local @%s", p.peek().Line, name)
+	}
+	
+	// Parse stack.new(...)
+	decl, err := p.parseStackDecl(name)
+	if err != nil {
+		return nil, err
+	}
+	
+	// Mark as local
+	if sd, ok := decl.(*ast.StackDecl); ok {
+		sd.Local = true
+		return sd, nil
+	}
+	
+	return nil, fmt.Errorf("line %d: local declaration must be a stack.new()", p.peek().Line)
 }
 
 func (p *Parser) parseStackDecl(name string) (ast.Stmt, error) {

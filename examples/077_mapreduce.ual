@@ -1,0 +1,72 @@
+-- 077: Map-Reduce Pattern
+-- Distribute work to mappers, collect and reduce results
+
+@work = stack.new(i64)
+@mapped = stack.new(i64)
+@done = stack.new(i64)
+
+-- Input data
+@work < 1
+@work < 2
+@work < 3
+@work < 4
+
+-- Mapper 1: squares its input
+@spawn < {
+    var n i64 = 0
+    @work take:n
+    @mapped < (n * n)
+    @done < 1
+}
+
+-- Mapper 2
+@spawn < {
+    var n i64 = 0
+    @work take:n
+    @mapped < (n * n)
+    @done < 1
+}
+
+-- Mapper 3
+@spawn < {
+    var n i64 = 0
+    @work take:n
+    @mapped < (n * n)
+    @done < 1
+}
+
+-- Mapper 4
+@spawn < {
+    var n i64 = 0
+    @work take:n
+    @mapped < (n * n)
+    @done < 1
+}
+
+-- Start all mappers
+@spawn pop play pop play pop play pop play
+
+-- Wait for all mappers
+var d1 i64 = 0
+var d2 i64 = 0
+var d3 i64 = 0
+var d4 i64 = 0
+@done take:d1
+@done take:d2
+@done take:d3
+@done take:d4
+
+-- Reduce: sum all mapped values
+var sum i64 = 0
+var r1 i64 = 0
+var r2 i64 = 0
+var r3 i64 = 0
+var r4 i64 = 0
+@mapped take:r1
+@mapped take:r2
+@mapped take:r3
+@mapped take:r4
+push:(r1 + r2 + r3 + r4) let:sum
+
+-- Expected: 1^2 + 2^2 + 3^2 + 4^2 = 1 + 4 + 9 + 16 = 30
+push:sum dot

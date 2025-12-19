@@ -1,0 +1,2 @@
+-- Runtime error test: undefined stack
+@nonexistent push(1)

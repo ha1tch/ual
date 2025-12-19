@@ -1,4 +1,4 @@
--- 07: GCD (Greatest Common Divisor) - Euclidean algorithm
+-- 007: GCD (Greatest Common Divisor) - Euclidean algorithm
 -- Compute GCD for 1000 pairs
 
 var total_gcd i64 = 0

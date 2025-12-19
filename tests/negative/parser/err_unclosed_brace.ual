@@ -1,0 +1,5 @@
+-- Parser error test: unclosed brace
+@stack = stack.new(i64)
+@stack {
+    push(1)
+-- missing closing brace

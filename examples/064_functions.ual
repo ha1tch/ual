@@ -12,15 +12,15 @@ func showSum(a i64, b i64) {
 
 -- Function with return type
 func sum(a i64, b i64) i64 {
-    push:a push:b add let:result
     var result i64 = 0
+    push:a push:b add let:result
     return result
 }
 
 -- Function with single param and return
 func square(n i64) i64 {
-    push:n push:n mul let:sq
     var sq i64 = 0
+    push:n push:n mul let:sq
     return sq
 }
 
@@ -37,8 +37,8 @@ func factorial(n i64) i64 {
 
 -- Function for shorthand demo
 func double(n i64) i64 {
-    push:n push:2 mul let:r
     var r i64 = 0
+    push:n push:2 mul let:r
     return r
 }
 

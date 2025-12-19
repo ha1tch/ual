@@ -38,4 +38,4 @@
 @check = stack.new(i64)
 @check push(1)
 @check pop
-print
+dot

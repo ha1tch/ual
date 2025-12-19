@@ -3,6 +3,8 @@ package main
 import (
 	"errors"
 	"fmt"
+	"os"
+	"time"
 
 	"github.com/ha1tch/ual/pkg/ast"
 	"github.com/ha1tch/ual/pkg/runtime"
@@ -50,10 +52,9 @@ func (i *Interpreter) execWhileStmt(s *ast.WhileStmt) error {
 			break
 		}
 		
-		// Each iteration gets its own scope for local variables
-		i.vars.PushScope()
+		// Execute body without pushing scope each iteration
+		// Variables are already scoped at the function/compute block level
 		err = i.execBlock(s.Body)
-		i.vars.PopScope()
 		
 		if err != nil {
 			if errors.Is(err, errBreak) {
@@ -309,7 +310,7 @@ func (i *Interpreter) execStatusStmt(s *ast.StatusStmt) error {
 	return nil
 }
 
-// execSelectStmt executes a select block (simplified - no actual concurrency).
+// execSelectStmt executes a select block with proper blocking semantics.
 func (i *Interpreter) execSelectStmt(s *ast.SelectStmt) error {
 	// Execute setup block
 	if s.Block != nil {
@@ -318,52 +319,104 @@ func (i *Interpreter) execSelectStmt(s *ast.SelectStmt) error {
 		}
 	}
 	
-	// In interpreter, select is simplified - try each case in order
+	// Check if we have a default case (non-blocking) or timeout
+	hasDefault := false
+	var timeoutMs int64 = 0
+	var timeoutCase ast.SelectCase
+	hasTimeout := false
 	for _, c := range s.Cases {
-		stackName := c.Stack
-		if stackName == "" {
-			stackName = s.DefaultStack
+		if c.Stack == "_" {
+			hasDefault = true
 		}
-		if stackName == "_" {
-			// Default case
-			return i.execBlock(c.Handler)
-		}
-		
-		stack, ok := i.stacks[stackName]
-		if !ok {
-			continue
-		}
-		
-		if stack.Len() > 0 {
-			val, err := stack.Pop()
-			if err != nil {
-				continue
+		if c.TimeoutMs != nil {
+			// Evaluate timeout expression
+			val, err := i.evalExpr(c.TimeoutMs)
+			if err == nil {
+				timeoutMs = val.AsInt()
 			}
-			
-			i.vars.PushScope()
-			if len(c.Bindings) > 0 {
-				i.vars.Set(c.Bindings[0], val)
-			}
-			err = i.execBlock(c.Handler)
-			i.vars.PopScope()
-			return err
+			timeoutCase = c
+			hasTimeout = true
 		}
 	}
 	
-	// No case matched, check for timeout
-	for _, c := range s.Cases {
-		if c.TimeoutMs != nil {
-			// Execute timeout handler
-			if c.TimeoutFn != nil {
-				// Call the timeout function
-				_, err := i.evalFnLit(c.TimeoutFn)
+	// Calculate deadline if we have a timeout
+	var deadline time.Time
+	if timeoutMs > 0 {
+		deadline = time.Now().Add(time.Duration(timeoutMs) * time.Millisecond)
+	}
+	
+	// Blocking loop - keep trying until a case matches
+	for {
+		// Try each case
+		for _, c := range s.Cases {
+			stackName := c.Stack
+			if stackName == "" {
+				stackName = s.DefaultStack
+			}
+			if stackName == "_" {
+				// Default case - only execute if this is a non-blocking select
+				// (handled after the loop below)
+				continue
+			}
+			
+			stack, ok := i.stacks[stackName]
+			if !ok {
+				continue
+			}
+			
+			if stack.Len() > 0 {
+				val, err := stack.Pop()
+				if err != nil {
+					continue
+				}
+				
+				i.vars.PushScope()
+				if len(c.Bindings) > 0 {
+					i.vars.Set(c.Bindings[0], val)
+				}
+				err = i.execBlock(c.Handler)
+				i.vars.PopScope()
+				return err
+			}
+		}
+		
+		// Check timeout
+		if timeoutMs > 0 && time.Now().After(deadline) {
+			// Execute timeout handler if present
+			if hasTimeout && timeoutCase.TimeoutFn != nil {
+				_, err := i.evalFnLit(timeoutCase.TimeoutFn)
 				return err
 			}
 			return nil
 		}
+		
+		// If we have a default case, execute it now (no data on any stack)
+		if hasDefault {
+			for _, c := range s.Cases {
+				if c.Stack == "_" {
+					return i.execBlock(c.Handler)
+				}
+			}
+		}
+		
+		// If non-blocking (has default), we would have returned above
+		// For blocking select without timeout, keep waiting
+		if !hasDefault && timeoutMs == 0 {
+			// Blocking wait - sleep a bit to prevent busy-waiting
+			// Use a short sleep (100 microseconds) for responsiveness
+			time.Sleep(100 * time.Microsecond)
+			continue
+		}
+		
+		// Blocking select with timeout - sleep and retry
+		if timeoutMs > 0 {
+			time.Sleep(100 * time.Microsecond)
+			continue
+		}
+		
+		// Non-blocking without data - return
+		return nil
 	}
-	
-	return nil
 }
 
 // execComputeStmt executes a compute block (infix math).
@@ -381,29 +434,76 @@ func (i *Interpreter) execComputeStmt(s *ast.ComputeStmt) error {
 		stack = i.stacks["dstack"]
 	}
 	
+	// Try compiled fast path
+	compiled, found := i.compiledCompute[s]
+	if !found {
+		// Try to compile
+		compiler := NewComputeCompiler()
+		var err error
+		compiled, err = compiler.Compile(s.Params, s.Body)
+		if err != nil {
+			// Mark as uncompilable (use nil)
+			compiled = nil
+		}
+		i.compiledCompute[s] = compiled
+	}
+	
+	if compiled != nil {
+		// Fast path: use compiled threaded code
+		params := make([]float64, len(s.Params))
+		for idx := 0; idx < len(s.Params); idx++ {
+			val, err := stack.Pop()
+			if err != nil {
+				val = NewFloat(0)
+			}
+			params[idx] = val.AsFloat()
+		}
+		
+		result, err := compiled.Execute(params)
+		if err != nil {
+			return err
+		}
+		
+		if result.Type != runtime.VTNil {
+			if stack.IsHash() {
+				stack.Set("__result_0__", result)
+			} else {
+				stack.Push(result)
+			}
+		}
+		return nil
+	}
+	
+	// Slow path: tree-walking interpreter (for unsupported constructs)
+	return i.execComputeStmtSlow(s, stack)
+}
+
+// execComputeStmtSlow is the fallback tree-walking execution for compute blocks.
+func (i *Interpreter) execComputeStmtSlow(s *ast.ComputeStmt, stack *ValueStack) error {
 	// Set computeStack for self reference
 	oldComputeStack := i.computeStack
 	i.computeStack = stack
 	defer func() { i.computeStack = oldComputeStack }()
 	
-	// Pop values for each parameter
-	i.vars.PushScope()
-	defer i.vars.PopScope()
+	// Set up fast local variables cache
+	oldLocalVars := i.localVars
+	oldInComputeBlock := i.inComputeBlock
+	i.localVars = make(map[string]Value, 16) // Pre-allocate for typical use
+	i.inComputeBlock = true
+	defer func() {
+		i.localVars = oldLocalVars
+		i.inComputeBlock = oldInComputeBlock
+	}()
 	
+	// Pop values for each parameter and store in local vars cache
 	// LIFO order: first param gets top of stack (last pushed value)
-	paramValues := make([]Value, len(s.Params))
 	for idx := 0; idx < len(s.Params); idx++ {
 		val, err := stack.Pop()
 		if err != nil {
 			// Use zero if not enough values
 			val = NewInt(0)
 		}
-		paramValues[idx] = val
-	}
-	
-	// Bind parameters
-	for idx, param := range s.Params {
-		i.vars.Set(param, paramValues[idx])
+		i.localVars[s.Params[idx]] = val
 	}
 	
 	// Execute compute body
@@ -467,15 +567,39 @@ func (i *Interpreter) execSpawnPush(s *ast.SpawnPush) error {
 	
 	// Create the task closure with isolated execution context
 	task := func() {
-		// Create a child interpreter that shares stacks but has its own vars
+		// Create a child interpreter that shares user stacks but has its own operational stacks
+		// User-defined stacks (@buffer, @slots, etc.) are shared and thread-safe
+		// But dstack/rstack/bool/error must be per-goroutine to avoid race conditions
+		childStacks := make(map[string]*runtime.ValueStack)
+		for name, stack := range i.stacks {
+			switch name {
+			case "dstack", "rstack", "bool", "error":
+				// Create fresh operational stacks for this goroutine
+				childStacks[name] = runtime.NewValueStack(runtime.LIFO)
+			default:
+				// Share user-defined stacks
+				childStacks[name] = stack
+			}
+		}
+		
+		// Copy stackTypes so local stack declarations don't race with other goroutines
+		childStackTypes := make(map[string]string, len(i.stackTypes))
+		for k, v := range i.stackTypes {
+			childStackTypes[k] = v
+		}
+		
 		child := &Interpreter{
-			funcs:  i.funcs,   // Share function definitions
-			stacks: i.stacks,  // Share stacks (thread-safe)
-			views:  i.views,   // Share views
-			vars:   vars,
+			funcs:           i.funcs,          // Share function definitions
+			stacks:          childStacks,      // Mixed: own operational stacks, shared user stacks
+			stackTypes:      childStackTypes,  // Own copy for local stack declarations
+			views:           i.views,          // Share views
+			vars:            vars,
+			compiledCompute: make(map[*ast.ComputeStmt]*CompiledCompute),
 		}
 		child.vars.PushScope()
-		child.execBlock(body)
+		if err := child.execBlock(body); err != nil {
+			fmt.Fprintf(os.Stderr, "[spawn error] %v\n", err)
+		}
 		child.vars.PopScope()
 	}
 	

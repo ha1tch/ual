@@ -1,0 +1,9 @@
+-- Parser error test: invalid compute block syntax
+@stack = stack.new(i64)
+@stack push(5)
+
+@stack {
+}.compute({
+    -- missing bindings |...|
+    return x
+})

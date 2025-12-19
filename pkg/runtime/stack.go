@@ -133,7 +133,7 @@ func (s *Stack) Push(value []byte, key ...[]byte) error {
 		// Check if key exists - update in place
 		if idx, exists := s.hashIdx[keyStr]; exists {
 			s.elements[idx] = elem
-			s.cond.Signal() // wake one waiter
+			s.cond.Broadcast() // wake all waiters
 			return nil
 		}
 		
@@ -144,7 +144,7 @@ func (s *Stack) Push(value []byte, key ...[]byte) error {
 		s.hashIdx[keyStr] = idx
 	}
 	
-	s.cond.Signal() // wake one waiter
+	s.cond.Broadcast() // wake all waiters
 	return nil
 }
 
@@ -559,53 +559,54 @@ func hashBytes(b []byte) uint64 {
 // Optional timeout in milliseconds (0 = wait forever).
 // Returns nil, error if stack is closed or timeout.
 func (s *Stack) Take(timeoutMs ...int64) ([]byte, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	
 	timeout := int64(0)
 	if len(timeoutMs) > 0 {
 		timeout = timeoutMs[0]
 	}
 	
-	// Wait for data
-	for len(s.elements)-s.head == 0 && !s.closed {
-		if timeout > 0 {
-			// Timed wait using a goroutine
-			done := make(chan bool, 1)
-			go func() {
-				s.mu.Lock()
-				s.cond.Wait()
-				s.mu.Unlock()
-				done <- true
-			}()
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	
+	// Set up timeout if specified
+	var timedOut bool
+	var timer *time.Timer
+	if timeout > 0 {
+		timer = time.AfterFunc(time.Duration(timeout)*time.Millisecond, func() {
+			s.mu.Lock()
+			timedOut = true
+			s.cond.Broadcast() // wake to check timeout
 			s.mu.Unlock()
-			
-			select {
-			case <-done:
-				s.mu.Lock()
-			case <-timeAfter(timeout):
-				s.mu.Lock()
-				return nil, errors.New("take timeout")
-			}
-		} else {
-			s.cond.Wait()
-		}
+		})
+		defer timer.Stop()
+	}
+	
+	// Wait loop - condvar pattern with Broadcast for robustness
+	for len(s.elements)-s.head == 0 && !s.closed && !timedOut {
+		s.cond.Wait() // atomically: unlock, wait, re-lock
+	}
+	
+	// Check why we woke up
+	if timedOut {
+		return nil, errors.New("take timeout")
 	}
 	
 	if s.closed && len(s.elements)-s.head == 0 {
 		return nil, errors.New("stack closed")
 	}
 	
-	// Now pop based on perspective
+	// We have an element - take it
+	return s.popElement().data, nil
+}
+
+// popElement removes and returns an element (must hold lock)
+func (s *Stack) popElement() Element {
 	var elem Element
-	
 	switch s.perspective {
 	case LIFO:
 		idx := len(s.elements) - 1
 		elem = s.elements[idx]
 		s.elements = s.elements[:idx]
 		s.keys = s.keys[:idx]
-		
 	case FIFO:
 		idx := s.head
 		elem = s.elements[idx]
@@ -613,16 +614,13 @@ func (s *Stack) Take(timeoutMs ...int64) ([]byte, error) {
 		if s.head > len(s.elements)/2 && s.head > 100 {
 			s.compact()
 		}
-		
 	default:
-		// For indexed/hash, behave like LIFO
 		idx := len(s.elements) - 1
 		elem = s.elements[idx]
 		s.elements = s.elements[:idx]
 		s.keys = s.keys[:idx]
 	}
-	
-	return elem.data, nil
+	return elem
 }
 
 // TakeWithContext removes and returns an element, blocking until one is available

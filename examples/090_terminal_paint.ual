@@ -1,0 +1,58 @@
+-- 090: Terminal Painting Primitives
+-- Demonstrates ANSI escape sequences for terminal graphics
+
+-- Clear screen and home cursor
+print("\e[2J\e[1;1H")
+
+-- Draw a frame
+print("\e[2;5H")
+println("+------------------+")
+print("\e[3;5H")
+println("|  UAL Terminal    |")
+print("\e[4;5H")
+println("|  Paint Demo      |")
+print("\e[5;5H")
+println("+------------------+")
+
+-- Draw colored text
+print("\e[7;5H")
+print("Colors: ")
+print("\e[38;5;196mRED ")
+print("\e[38;5;46mGREEN ")
+print("\e[38;5;21mBLUE ")
+print("\e[38;5;226mYELLOW")
+print("\e[0m")
+println("")
+
+-- Draw a grayscale gradient bar using loop
+print("\e[9;5H")
+print("Gray:   ")
+var g i64 = 232
+while (g < 256) {
+    print("\e[48;5;")
+    print:g
+    print("m ")
+    push:(g + 1) let:g
+}
+print("\e[0m")
+println("")
+
+-- Draw colored blocks with loop
+print("\e[11;5H")
+print("Blocks: ")
+var i i64 = 0
+while (i < 8) {
+    -- Set background color (cycle through rainbow)
+    var color i64 = 0
+    push:(196 + i * 6) let:color
+    print("\e[48;5;")
+    print:color
+    print("m  ")
+    push:(i + 1) let:i
+}
+print("\e[0m")
+println("")
+
+-- Final position
+print("\e[14;1H\e[0m")
+println("Done.")

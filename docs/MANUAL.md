@@ -1,6 +1,6 @@
 # ual Manual
 
-**Version 0.7.3**
+**Version 0.7.4**
 
 A systems language for orchestration and embedded computation, presented with a scripting-style surface.
 
@@ -8,14 +8,14 @@ A systems language for orchestration and embedded computation, presented with a 
 
 ## What is ual?
 
-ual is a stack-based language that compiles to Go. It occupies a unique position: the ergonomics of a scripting language with the performance and predictability of a systems language.
+ual is a stack-based language that compiles to Go or Rust. It occupies a unique position: the ergonomics of a scripting language with the performance and predictability of a systems language.
 
 ```
 Surface Feel          Actual Semantics
 ─────────────────     ─────────────────────────────────
 Forth-like ops        Explicit data flow, typed containers
 Erlang-like select    Deterministic scheduling, structured
-Inline DSL blocks     Native Go codegen, zero overhead
+Inline DSL blocks     Native codegen, zero overhead
 ```
 
 ual is designed for:
@@ -27,16 +27,36 @@ ual is designed for:
 
 ## Prerequisites
 
-**To build ual from source:** Go 1.22 or later must be installed. This is the only dependency.
+**To build ual from source:** Go 1.22 or later must be installed.
 
-**To compile ual programs to native binaries:** You need both the ual compiler and Go installed. Go is a separate project by the Go Authors and can be downloaded here: https://go.dev/dl/
+**To compile ual programs to native binaries:** You need the ual compiler plus at least one of:
+- Go 1.22 or later (default backend), or
+- Rust 1.75 or later (alternative backend, smaller binaries)
 
-**To run ual programs without compiling:** You can use the interpreter without installing Go. Download iual for your platform here: https://github.com/ha1tch/ual/releases
+**To run ual programs without compiling:** You can use the interpreter (`iual`) without installing Go or Rust.
 
 ```bash
 # Check Go installation
 go version
+
+# Check Rust installation (optional)
+rustc --version
 ```
+
+### Automatic Target Selection
+
+When no `--target` is specified for `build` or `run`, ual automatically selects the best available backend:
+
+| Target specified | Go ≥1.22 | Rust ≥1.75 | Action |
+|------------------|----------|------------|--------|
+| none | ✓ | ✓ | use Go |
+| none | ✓ | ✗ | use Go |
+| none | ✗ | ✓ | use Rust |
+| none | ✗ | ✗ | fail |
+| `--target go` | ✓ | — | use Go |
+| `--target go` | ✗ | — | fail |
+| `--target rust` | — | ✓ | use Rust |
+| `--target rust` | — | ✗ | fail |
 
 ## Installation
 
@@ -58,7 +78,7 @@ go build -o iual ./cmd/iual
 
 ```bash
 # Commands
-ual compile program.ual     # Compile to Go source (.go)
+ual compile program.ual     # Compile to source (.go or .rs)
 ual build program.ual       # Build executable binary
 ual run program.ual         # Compile and run immediately
 ual tokens program.ual      # Show lexer tokens
@@ -66,24 +86,33 @@ ual ast program.ual         # Show parse tree
 ual version                 # Show version
 ual help                    # Show help
 
-# Options
+# General options
 -o, --output <path>         # Output file path
+--target <lang>             # Target: go (default) or rust
 -q, --quiet                 # Suppress non-error output
 -v, --verbose               # Show detailed compilation info
 -vv, --debug                # Show debug information
 -O, --optimize              # Use optimised dstack
 --version                   # Show version and exit
 
+# Build profile options (for 'build' command)
+--release                   # Standard release build (default)
+--small                     # Size-optimised (smallest binary)
+--build-debug               # Debug build with symbols
+--strip                     # Strip symbols from binary
+
 # Examples
-ual compile program.ual           # Creates program.go
-ual build -o myapp program.ual    # Creates myapp binary
-ual -q run program.ual            # Run quietly
-ual -v build program.ual          # Verbose build
+ual compile program.ual                  # Creates program.go
+ual compile --target rust program.ual    # Creates program.rs
+ual build -o myapp program.ual           # Creates myapp binary
+ual build --small --target rust prog.ual # Small Rust binary (~343K)
+ual -q run program.ual                   # Run quietly
+ual -v build program.ual                 # Verbose build
 ```
 
 ### Interpreter (iual)
 
-The interpreter runs UAL programs directly without compilation. Useful for development and testing.
+The interpreter runs ual programs directly without compilation. Useful for development and testing.
 
 ```bash
 # Commands
@@ -104,7 +133,15 @@ iual --trace program.ual    # Trace execution
 iual -q program.ual         # Quiet mode
 ```
 
-**Performance Note:** The interpreter is approximately 10-50x slower than compiled code. For production workloads, use `ual build`.
+**Performance:** The interpreter uses **threaded code compilation** for compute blocks, achieving 4-13x faster performance than Python on numeric workloads:
+
+| Benchmark | Python | iual | Advantage |
+|-----------|--------|------|-----------|
+| Leibniz π (1M) | 196ms | 50ms | 3.9x faster |
+| Mandelbrot 50×50 | 172ms | 13ms | 13.2x faster |
+| Newton sqrt ×1000 | 44ms | 11ms | 4.0x faster |
+
+General stack operations remain slower than compiled code (use `ual build` for production).
 
 **Concurrency:** The interpreter uses real goroutines for `@spawn pop play`, matching the compiler's semantics. Both tools share the same runtime types from `pkg/runtime/`.
 
@@ -127,7 +164,7 @@ iual -q program.ual         # Quiet mode
 })
 
 @numbers pop
-print
+dot
 -- Output: 120
 ```
 
@@ -183,8 +220,10 @@ ual provides default stacks for common patterns (Forth-style):
 push(10)
 push(20)
 add
-print    -- Output: 30
+dot      -- Output: 30
 ```
+
+**Note:** In spawned tasks (`@spawn pop play`), each goroutine gets its own private copies of `@dstack`, `@rstack`, `@bool`, and `@error`. This prevents race conditions when multiple goroutines use stack operations concurrently. User-defined stacks remain shared. See the Spawn section for details.
 
 ---
 
@@ -205,16 +244,34 @@ val = @numbers pop()        -- pop into variable
 @floats push:-3.14          -- negative float
 ```
 
-**Type Safety**: The compiler enforces type compatibility at compile time:
+**Type Safety**: ual enforces strict type safety. There is **no implicit type conversion** — the only way to convert between types is via `bring()`.
+
+However, **numeric literals without a decimal point** (like `42`) have ambiguous representation and their type is inferred from context at compile time:
 
 ```ual
 @integers = stack.new(i64)
-@integers push:42           -- OK: integer to integer stack
-@integers push:3.14         -- ERROR: cannot push float to i64 stack
+@integers push(42)           -- OK: 42 inferred as i64
+@integers push(3.14)         -- ERROR: cannot push f64 to i64 stack
 
 @floats = stack.new(f64)
-@floats push:3.14           -- OK: float to float stack
-@floats push:42             -- OK: integer widened to float
+@floats push(3.14)           -- OK: unambiguously f64
+@floats push(42)             -- OK: 42 inferred as f64 (not conversion!)
+```
+
+Variables and stack values have fixed types. Moving values between incompatible types requires explicit `bring()`:
+
+```ual
+@ints = stack.new(i64)
+@floats = stack.new(f64)
+var x i64 = 0
+
+@floats push(3.14)
+@floats pop:x                -- ERROR: cannot pop f64 to i64 variable
+@floats let:x                -- ERROR: same rule
+
+-- Use bring() for type conversion:
+@ints bring(@floats)         -- OK: converts f64 → i64 (truncates)
+@ints pop:x                  -- OK: i64 to i64
 ```
 
 ### Stack Operators (Forth-Style)
@@ -246,9 +303,53 @@ push:5 push:3 lt        -- false (5 < 3)
 
 ### Output
 
+ual provides consistent output operations. The rule is simple: **`print` never adds a newline, `println` always does.**
+
+| Operation | Available Forms | Newline | Description |
+|-----------|-----------------|---------|-------------|
+| `print` | `print`, `print:X`, `print(X)`, `print(X,Y,...)` | No | Output value(s) |
+| `println` | `println`, `println:X`, `println(X)`, `println(X,Y,...)` | Yes | Output value(s) + newline |
+| `emit` | `emit`, `emit:X` | No | Output as character (ASCII) |
+| `dot` | `dot` | Yes | Forth-style pop and print |
+
 ```ual
-print       -- peek and print (non-destructive)
-dot         -- pop and print (destructive, Forth-style)
+-- print: no newline (all forms)
+print           -- pop from dstack, print
+print:X         -- print value X
+print(X)        -- print value X
+print(X, Y, Z)  -- print multiple values (space-separated)
+
+-- println: with newline (all forms)
+println         -- pop from dstack, print + newline
+println:X       -- print value X + newline
+println(X)      -- print value X + newline
+println(X, Y)   -- print multiple values + newline
+
+-- emit: character output (no newline)
+emit            -- pop from dstack, print as char
+emit:X          -- print X as character
+
+-- dot: Forth-style (equivalent to println stack form)
+dot             -- pop and print with newline
+```
+
+**Examples:**
+
+```ual
+-- Building output piece by piece
+print:1 print:2 print:3 emit:10    -- output: 123\n
+
+-- Line-oriented output  
+println:42                          -- output: 42\n
+println("Hello", "world")           -- output: Hello world\n
+
+-- Character output
+emit:72 emit:105 emit:33 emit:10   -- output: Hi!\n
+push:65 emit                        -- output: A (no newline)
+
+-- Stack forms
+push:999 dot                        -- pops and prints: 999\n
+push:888 print emit:10              -- pops 888, prints it, then newline
 ```
 
 ### Return Stack
@@ -348,7 +449,7 @@ Stack blocks group operations on a specific stack:
 @person set("city", "London")
 
 @person get("name")     -- pushes "Alice" to @dstack
-print                   -- Output: Alice
+dot                     -- Output: Alice
 ```
 
 ---
@@ -459,11 +560,22 @@ abs(x)      min(x, y)   max(x, y)
 
 ### Performance
 
-Compute blocks compile to native Go loops. Benchmarks show:
+**Compiled backends** (Go/Rust): Compute blocks compile to native loops with zero overhead:
 
-| vs Go | vs C | vs Python |
-|-------|------|-----------|
-| 1.0x (identical) | 1.0-1.7x | 30-100x faster |
+| Backend | vs C | Notes |
+|---------|------|-------|
+| ual → Go | 0.8-1.0x | Sometimes faster due to optimisations |
+| ual → Rust | 0.8-1.0x | Comparable to Go |
+
+**Interpreter** (iual): Compute blocks use threaded code compilation:
+
+| vs Python | iual Advantage |
+|-----------|----------------|
+| Leibniz π (1M iterations) | 3.9x faster |
+| Mandelbrot (2500 pixels) | 13.2x faster |
+| Newton sqrt (1000 iterations) | 4.0x faster |
+
+The interpreter pre-compiles compute blocks to closures with direct slot access, eliminating AST dispatch and map lookups.
 
 Use `.compute()` freely for any computation >1μs. For very short computations (<100ns), batch multiple operations into a single compute block.
 
@@ -511,10 +623,81 @@ Each case can have its own timeout:
 
 ### Spawn
 
-Launch concurrent tasks:
+Launch concurrent tasks using the `@spawn` stack:
 
 ```ual
-@spawn worker()         -- runs in new goroutine
+-- Queue a task (closure)
+@spawn < {
+    -- code to run concurrently
+    @results push(100)
+}
+
+-- Start the task in a new goroutine
+@spawn pop play
+```
+
+**Spawn Operations:**
+
+| Operation | Effect |
+|-----------|--------|
+| `@spawn < { ... }` | Queue a task closure |
+| `@spawn pop play` | Pop and run task in new goroutine |
+| `@spawn peek play` | Run top task without removing |
+| `@spawn pop` | Remove task without running |
+| `@spawn len` | Push task count to dstack |
+| `@spawn clear` | Remove all queued tasks |
+
+**Stack Isolation in Spawned Tasks:**
+
+When a task runs via `@spawn pop play`, it gets its own private copies of the operational stacks (`@dstack`, `@rstack`, `@bool`, `@error`). This prevents race conditions when multiple goroutines use Forth-style stack operations concurrently.
+
+User-defined stacks (like `@results`, `@buffer`) remain **shared** between all goroutines and are thread-safe. Use these for communication between tasks.
+
+```ual
+@results = stack.new(i64)
+@done = stack.new(i64)
+
+-- These closures each get their own @dstack
+@spawn < {
+    push:10 push:20 add    -- uses private @dstack
+    pop:sum                 -- sum is local
+    @results push(sum)      -- @results is shared
+    @done push(1)
+}
+
+@spawn < {
+    push:5 push:5 mul       -- different private @dstack
+    pop:product
+    @results push(product)
+    @done push(1)
+}
+
+@spawn pop play
+@spawn pop play
+
+-- Wait for both tasks
+@done take:x
+@done take:y
+
+-- Results available
+@results dot    -- 30 or 25 (order depends on scheduling)
+@results dot    -- 25 or 30
+```
+
+**Synchronisation:**
+
+Use `take` for blocking synchronisation between tasks:
+
+```ual
+@signal = stack.new(i64)
+
+@spawn < {
+    -- do work
+    @signal push(1)    -- signal completion
+}
+
+@spawn pop play
+@signal take:done      -- blocks until signal arrives
 ```
 
 ---
@@ -639,17 +822,104 @@ This enables patterns like work-stealing where an owner works LIFO (cache-friend
 
 ## Part 10: Bring
 
-Atomic transfer between stacks with type conversion:
+`bring()` is the **only** mechanism for type conversion in ual. It performs atomic transfer between stacks with explicit type conversion:
 
 ```ual
 @source = stack.new(i64)
 @dest = stack.new(f64)
 
 @source push(42)
-@source bring(@dest)      -- transfers and converts i64 → f64
+@dest bring(@source)         -- transfers and converts i64 → f64
 ```
 
+Supported conversions:
+- `i64 → f64`: lossless promotion
+- `f64 → i64`: truncation (fractional part discarded)
+- `numeric → string`: decimal representation
+- `string → numeric`: error (future: `bring_base()`)
+
 Bring is atomic: if conversion fails, source is unchanged.
+
+---
+
+## Part 11: Type System
+
+ual enforces strict type safety. Understanding the type system is essential for writing correct programs.
+
+### The Core Rule
+
+**No implicit type conversion** — values maintain their type throughout their lifetime. The only operation that performs type conversion is `bring()`.
+
+### Literal Type Inference
+
+Literals are typed at compile time based on context:
+
+| Literal | Type | Notes |
+|---------|------|-------|
+| `123.45` | f64 | Decimal point makes float unambiguous |
+| `"hello"` | string | Quotes make string unambiguous |
+| `true`/`false` | bool | Keywords make bool unambiguous |
+| `123` | inferred | Ambiguous — could be i64 or f64 |
+
+Ambiguous numeric literals (integers without decimal point) are inferred from their target context:
+
+```ual
+@ints = stack.new(i64)
+@floats = stack.new(f64)
+
+@ints push(42)      -- 42 is inferred as i64
+@floats push(42)    -- 42 is inferred as f64 (42.0)
+```
+
+This is **type inference**, not type conversion. The literal `42` has no inherent type until placed in context — we determine what `42` means based on where it's used.
+
+### Strict Type Matching
+
+Once a value is typed, it stays typed. Operations that move values between stacks and variables require exact type matches:
+
+```ual
+@ints = stack.new(i64)
+var x i64 = 0
+var y f64 = 0.0
+
+@ints push(42)
+@ints pop:x         -- OK: i64 → i64
+@ints push(42)
+@ints pop:y         -- ERROR: i64 → f64 requires bring()
+```
+
+The same applies to `let`:
+
+```ual
+var result i64 = 0
+push:10 push:20 add let:result   -- OK: @dstack is i64, result is i64
+```
+
+### Variables
+
+Variables must be explicitly declared with a type:
+
+```ual
+var x i64 = 0       -- x is i64
+var y f64 = 0.0     -- y is f64
+var name string = ""
+```
+
+Variables are backed by typed stacks internally. Assigning a value of the wrong type is an error:
+
+```ual
+@floats = stack.new(f64)
+@floats push(3.14)
+var x i64 = 0
+@floats let:x       -- ERROR: f64 → i64 requires bring()
+```
+
+### Summary
+
+1. Literals with unambiguous syntax (`123.45`, `"text"`, `true`) have fixed types
+2. Ambiguous numeric literals (`42`) are inferred from context — this is inference, not conversion
+3. Once typed, values require exact type matches for pop/let operations
+4. Use `bring()` when you need to convert between types
 
 ---
 
@@ -751,7 +1021,9 @@ BITWISE
     band bor bxor bnot shl shr
 
 OUTPUT
-    print (peek)    dot (pop)
+    print (no \n)   print:X   print(X, Y)    -- raw output
+    println (\n)    println:X println(X, Y)  -- line output
+    emit (char)     emit:X    dot (\n)       -- char / Forth-style
 
 CONTROL
     if { } elseif { } else { }
@@ -771,7 +1043,10 @@ CONCURRENCY
     @s {}.select( cases )
     timeout(ms, handler)
     retry() restart()
-    @spawn task()
+    @spawn < { task }     -- queue task closure
+    @spawn pop play       -- run task in goroutine
+    @spawn len / clear    -- manage task queue
+    -- Note: @dstack/@rstack are per-goroutine in spawned tasks
 
 ERROR HANDLING
     @s {}.consider( ok: {} error: {} _: {} )
@@ -783,7 +1058,14 @@ TRAVERSAL
     -- walk/filter disabled, use explicit loops
 
 BRING
-    @source bring(@dest)
+    @dest bring(@source)
+
+TYPE SYSTEM
+    No implicit conversion — bring() only
+    42 → inferred from context (i64 or f64)
+    123.45 → always f64
+    "text" → always string
+    pop:var / let:var require exact type match
 ```
 
 ---
@@ -792,11 +1074,13 @@ BRING
 
 - `CHANGELOG.md` — Version history and feature details
 - `COMPUTE_SPEC_V2.md` — Compute block specification
+- `CONCURRENCY.md` — Concurrency model and patterns
 - `DESIGN_v0.8.md` — Design document for v0.8 features
 - `ERROR_PHILOSOPHY.md` — Error handling philosophy
+- `PERFORMANCE.md` — Benchmark results vs C, Rust, Python
 - `BENCHMARK_SPECIFICATION.md` — Benchmark suite specification
-- `../examples/` — Working code examples (71 programs)
+- `../examples/` — Working code examples (92 programs)
 
 ---
 
-*ual v0.7.3 — A systems language disguised as a scripting language.*
+*ual v0.7.4 — A systems language disguised as a scripting language.*

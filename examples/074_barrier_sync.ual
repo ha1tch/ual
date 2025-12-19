@@ -1,0 +1,71 @@
+-- 074: Barrier Synchronization
+-- Multiple workers each do work, then wait at barrier before continuing
+
+@barrier = stack.new(i64)
+@phase2 = stack.new(i64)
+@final = stack.new(i64)
+
+-- Worker 1: phase 1 work, signal, wait for phase 2, more work
+@spawn < {
+    -- Phase 1
+    var work1 i64 = 10
+    @barrier < work1
+    
+    -- Wait for phase 2 signal
+    var go i64 = 0
+    @phase2 take:go
+    
+    -- Phase 2
+    @final < (work1 * 2)
+}
+
+-- Worker 2
+@spawn < {
+    var work2 i64 = 20
+    @barrier < work2
+    
+    var go i64 = 0
+    @phase2 take:go
+    
+    @final < (work2 * 2)
+}
+
+-- Worker 3
+@spawn < {
+    var work3 i64 = 30
+    @barrier < work3
+    
+    var go i64 = 0
+    @phase2 take:go
+    
+    @final < (work3 * 2)
+}
+
+-- Start workers
+@spawn pop play pop play pop play
+
+-- Coordinator: wait for all phase 1, then release phase 2
+var p1 i64 = 0
+var p2 i64 = 0
+var p3 i64 = 0
+@barrier take:p1
+@barrier take:p2
+@barrier take:p3
+
+-- All at barrier, release them
+@phase2 < 1
+@phase2 < 1
+@phase2 < 1
+
+-- Collect final results
+var f1 i64 = 0
+var f2 i64 = 0
+var f3 i64 = 0
+@final take:f1
+@final take:f2
+@final take:f3
+
+-- Expected: (10+20+30) from phase 1, (20+40+60) from phase 2
+-- Sum of phase 1: 60, Sum of final: 120
+push:(p1 + p2 + p3) dot
+push:(f1 + f2 + f3) dot

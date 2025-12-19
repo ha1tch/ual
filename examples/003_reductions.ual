@@ -1,4 +1,4 @@
--- 03: Sum, Min, Max reductions over 1000 elements
+-- 003: Sum, Min, Max reductions over 1000 elements
 
 @data = stack.new(i64)
 

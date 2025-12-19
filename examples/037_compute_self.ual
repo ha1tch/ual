@@ -43,4 +43,4 @@
 @verify = stack.new(i64)
 @verify push(1)
 @verify pop
-print
+dot

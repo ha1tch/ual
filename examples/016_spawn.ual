@@ -1,5 +1,8 @@
--- 16: @spawn concurrency
--- Demonstrates goroutine spawning with shared stacks
+-- 016: @spawn concurrency
+-- Demonstrates goroutine spawning with shared user stacks
+--
+-- Note: Each spawned task gets its own @dstack/@rstack (operational stacks)
+-- but user-defined stacks like @results are shared and thread-safe.
 
 @results = stack.new(i64)
 

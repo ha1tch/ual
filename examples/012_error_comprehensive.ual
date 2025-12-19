@@ -1,4 +1,4 @@
--- 12: Comprehensive error handling
+-- 012: Comprehensive error handling
 -- Demonstrates: @defer, panic/recover, @error stack
 
 -- ============================================

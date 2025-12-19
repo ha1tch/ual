@@ -81,9 +81,11 @@ MemberExpr    ::= "self" "." Ident
 The compute kernel operates in a **Locked Scope**. The stack mutex is held for the duration of the block.
 
 ### 3.1 Type Homogeneity
-The kernel is **Type Rigid**. There is no runtime type dispatch.
+The compiled kernel is **Type Rigid**. There is no runtime type dispatch in the Go and Rust backends.
 *   If `@stack` is `TypeInt64`: All variables, literals, and array views are `int64`.
 *   If `@stack` is `TypeFloat64`: All variables, literals, and array views are `float64`.
+
+The interpreter maintains type semantics through internal coercion; parameters from integer stacks are coerced to integers on return.
 
 ### 3.2 Data Tiers
 
@@ -227,3 +229,63 @@ func (s *Stack) GetAtRaw(index int) ([]byte, bool)
 
 ---
 **End of Specification.**
+
+---
+
+## Appendix: Interpreter Execution
+
+The `iual` interpreter implements compute blocks using **threaded code compilation** for performance competitive with Python and near-native on some workloads.
+
+### Threaded Code Architecture
+
+When a compute block is first executed, the interpreter:
+
+1. **Compiles** the AST to `[]func(*ComputeEnv)` — a slice of closures
+2. **Allocates slots** — variables become direct array indices (`env.floats[3]`)
+3. **Caches** the compiled code keyed by AST node pointer
+4. **Falls back** to tree-walking for unsupported constructs
+
+```go
+// ComputeEnv holds execution state
+type ComputeEnv struct {
+    floats   []float64  // f64 variable slots
+    ints     []int64    // i64 variable slots
+    bools    []bool     // bool variable slots
+    arrays   [][]float64 // local arrays
+    // ... control flow flags
+}
+```
+
+### Performance Impact
+
+| Benchmark | Tree-walking | Threaded | Speedup |
+|-----------|--------------|----------|---------|
+| Leibniz π (1M) | 561ms | 50ms | 11.2x |
+| Mandelbrot 50×50 | 66ms | 13ms | 5.1x |
+| Newton sqrt ×1000 | 21ms | 11ms | 1.9x |
+
+### vs Python
+
+| Benchmark | Python | iual | iual Advantage |
+|-----------|--------|------|----------------|
+| Leibniz π (1M) | 196ms | 50ms | 3.9x faster |
+| Mandelbrot 50×50 | 172ms | 13ms | 13.2x faster |
+| Newton sqrt ×1000 | 44ms | 11ms | 4.0x faster |
+
+### Why This Works
+
+The threaded code compiler eliminates:
+- **AST dispatch** (~5-10ns per operation)
+- **Map lookups** (~20-30ns per variable access)
+- **Type checking** per operation
+
+Go's compiler optimises the closure dispatch, often inlining small operations and keeping slot indices in registers.
+
+### Implementation
+
+See `cmd/iual/compute_compile.go` (~500 lines):
+- `ComputeCompiler` — walks AST, assigns slots, generates closures
+- `CompiledCompute` — cached compiled block with slot maps
+- `ComputeEnv` — execution environment with typed slot arrays
+
+The interpreter automatically uses the compiled path when available, with transparent fallback to tree-walking for edge cases.

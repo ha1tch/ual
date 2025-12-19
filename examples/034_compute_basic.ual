@@ -19,4 +19,4 @@
 
 -- Pop result to dstack and print (should be 200)
 @math pop
-print
+dot

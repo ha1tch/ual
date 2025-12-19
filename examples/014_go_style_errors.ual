@@ -1,4 +1,4 @@
--- 14: Go-style error handling pattern
+-- 014: Go-style error handling pattern
 -- Demonstrates the separation: errors vs panic vs @defer
 
 -- ============================================

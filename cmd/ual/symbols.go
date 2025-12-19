@@ -120,6 +120,20 @@ func (st *SymbolTable) Lookup(name string) *Symbol {
 	return st.symbols[name]
 }
 
+// CurrentScopeNatives returns names of native variables declared in current scope
+func (st *SymbolTable) CurrentScopeNatives() []string {
+	var names []string
+	if len(st.scopes) > 0 {
+		currentScope := st.scopes[len(st.scopes)-1]
+		for name, sym := range currentScope {
+			if sym.Native {
+				names = append(names, name)
+			}
+		}
+	}
+	return names
+}
+
 // TypeStack returns the stack name for a type
 func TypeStack(typ string) string {
 	switch typ {
