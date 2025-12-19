@@ -1,6 +1,6 @@
 # ual
 
-**Version 0.7.4**
+**Version 0.7.5**
 
 A coordination-first language for orchestration and embedded computation, presented with a scripting-style surface.
 
