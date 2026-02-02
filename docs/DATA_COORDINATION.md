@@ -82,14 +82,47 @@ Cramming them into one parameter list — and then struggling to recover their t
 
 ## Part II: The Four Core Concepts
 
-ual handles heterogeneous data through four interconnected concepts:
+ual handles heterogeneous data through four interconnected concepts, each with its own keyword:
 
-| Concept | What it is | What it does |
+| Keyword | What it is | What it does |
 |---------|------------|--------------|
-| **Relation** | A named coordination | Connects existing typed stacks |
-| **Constitution** | A named structure | Creates typed stacks, defines a shape |
-| **Union** | A set of constitutions | Allows one of several shapes |
-| **Sequence** | An ordered collection | Stores multiple instances, preserves order |
+| **`relation`** | A named coordination | Connects existing typed stacks |
+| **`constitution`** | A named structure | Creates typed stacks, defines a shape |
+| **`union`** | A set of constitutions | Allows one of several shapes |
+| **`collection`** | An ordered aggregation | Stores multiple instances, preserves order |
+
+### The Four Keywords Together
+
+These four keywords form a coherent family:
+
+```
+-- Coordinates existing stacks
+relation person(@names, @ages, @scores)
+
+-- Defines and creates structure
+constitution button {
+    label: string
+    onclick: action
+}
+
+constitution radio {
+    label: string
+    group: string
+    selected: bool
+}
+
+-- Combines constitutions into one type
+union widget { button, radio }
+
+-- Ordered heterogeneous storage
+collection @panel of widget
+```
+
+Each keyword announces what kind of thing you're defining:
+- `relation` — coordination of existing stacks
+- `constitution` — structure that creates its own stacks
+- `union` — alternation between constitutions
+- `collection` — aggregation of instances
 
 ### Concept 1: Relation
 
@@ -219,7 +252,7 @@ constitution tcp_packet {
 - Defines a named structure
 - Creates typed stacks for each field
 - Acts as a type for stack creation
-- Can be instantiated, unioned, sequenced
+- Can be instantiated, unioned, collected
 
 #### What It Is
 
@@ -228,8 +261,8 @@ A constitution **is a type**. You can:
 ```
 @packets = stack.new(tcp_packet)          -- stack of tcp_packet
 @packets <- tcp_packet(443, 8080, ...)    -- push instance
-widget := button | radio                   -- union of constitutions
-@panel = sequence(widget)                  -- sequence of union
+union widget { button, radio }            -- union of constitutions
+collection @panel of widget               -- collection of union
 ```
 
 #### What It Is Not
@@ -331,8 +364,10 @@ constitution dropdown {
     selected: i64
 }
 
-widget := button | radio | dropdown
+union widget { button, radio, dropdown }
 ```
+
+The `union` keyword declares that `widget` can be any of the listed constitutions.
 
 #### What It Does
 
@@ -416,27 +451,27 @@ for @panel {
 
 ---
 
-### Concept 4: Sequence
+### Concept 4: Collection
 
 #### What It Is
 
-A sequence is an ordered collection of constitution instances (or union instances). It explicitly preserves insertion order and supports heterogeneous elements via unions.
+A collection is an ordered aggregation of constitution instances (or union instances). It explicitly preserves insertion order and supports heterogeneous elements via unions.
 
 #### Syntax
 
 ```
-@children = sequence(widget)
+collection @children of widget
 ```
 
 Or for homogeneous:
 ```
-@items = sequence(button)
+collection @items of button
 ```
 
 #### What It Does
 
 - Stores instances in order
-- Supports unions (heterogeneous sequences)
+- Supports unions (heterogeneous collections)
 - Enables ordered iteration
 - Preserves insertion sequence
 
@@ -444,11 +479,11 @@ Or for homogeneous:
 
 In ual, "stack" refers to a typed, appendable collection with configurable access patterns called **perspectives**. A perspective controls how you access the underlying storage — LIFO (stack), FIFO (queue), indexed (array), or hash (map) — without changing the underlying dense column layout. Some perspectives (like hash) use auxiliary structures such as indices to provide efficient lookup. The default perspective is LIFO, but others are available.
 
-"Sequence" specifically means an ordered heterogeneous collection via union, where insertion order is always preserved.
+"Collection" specifically means an ordered heterogeneous aggregation via union, where insertion order is always preserved.
 
-| Aspect | Stack | Sequence |
+| Aspect | Stack | Collection |
 |--------|-------|----------|
-| Primary purpose | Typed storage with perspectives | Ordered heterogeneous collection |
+| Primary purpose | Typed storage with perspectives | Ordered heterogeneous aggregation |
 | Heterogeneous | No (single type) | Yes (via union) |
 | Order guarantee | Depends on perspective | Always insertion order |
 
@@ -475,12 +510,12 @@ constitution paragraph {
 
 constitution div {
     class: string
-    children: sequence(block_element)
+    children: collection of block_element
 }
 
-block_element := text_node | paragraph | div
+union block_element { text_node, paragraph, div }
 
-@doc = sequence(block_element)
+collection @doc of block_element
 
 @doc <- text_node("Hello, world!")
 @doc <- paragraph("intro", "Welcome to the site.")
@@ -678,7 +713,7 @@ The stacks don't exist independently — they exist *because* the constitution d
 | Is a type | No | Yes |
 | Can have instances | No | Yes |
 | Can be in a union | No | Yes |
-| Can be in a sequence | No | Yes |
+| Can be in a collection | No | Yes |
 | Coordinates existing stacks | Yes | No |
 | Reified with `.tuple()`/`for` | Yes | Yes |
 
@@ -765,12 +800,12 @@ The discriminant is stored separately from the field data in a compact array. Th
 
 Values remain untagged in their typed slices. The discriminant array tells you which constitution each slot belongs to, but the values themselves don't self-describe.
 
-### Sequence
+### Collection
 
-A sequence is a union store with guaranteed insertion order:
+A collection is a union store with guaranteed insertion order:
 
 ```go
-type WidgetSequence struct {
+type WidgetCollection struct {
     order []struct {
         kind  uint8
         index int
@@ -863,9 +898,9 @@ The CPU prefetcher loves sequential access. Cache misses are minimised. No point
 | Phone records, log entries | `constitution` + stack |
 | TCP/UDP packets | `constitution` (possibly nested) |
 | HTTP headers (variable-length, homogeneous) | `constitution header` + stack |
-| GUI panel with mixed widgets | `constitution` union + `sequence` |
-| HTML builder (text, paragraphs, divs) | `constitution` union + `sequence` |
-| Nested documents | `constitution` union + `sequence` |
+| GUI panel with mixed widgets | `union` + `collection` |
+| HTML builder (text, paragraphs, divs) | `union` + `collection` |
+| Nested documents | `union` + `collection` |
 | JSON/XML with known schema | Nested `constitution` |
 | Database pagination | `constitution` + pre-allocated stacks |
 
@@ -904,7 +939,7 @@ The document remains opaque. The extracted values are typed.
 
 ### Key-Based O(1) Lookup
 
-Relations and sequences are optimised for sequential access and iteration. O(1) lookup by key requires an index.
+Relations and collections are optimised for sequential access and iteration. O(1) lookup by key requires an index.
 
 **Solution:** Use a hash perspective (which uses an index), or build an explicit map from key to position. Data stays in dense storage; the index provides random access.
 
@@ -974,8 +1009,8 @@ The current model defines creation and iteration but leaves mutation and deletio
 - Are stable indices required? (Implies tombstones or indirection)
 - Is compaction explicit or automatic?
 
-**Deletion from sequences:**
-- Removing from a union sequence affects the order array
+**Deletion from collections:**
+- Removing from a union collection affects the order array
 - Do per-variant stores compact independently?
 - What happens to indices held elsewhere?
 
@@ -1014,10 +1049,10 @@ constitution tcp_packet {
 }
 
 -- Union
-widget := button | radio | dropdown
+union widget { button, radio, dropdown }
 
--- Sequence
-@panel = sequence(widget)
+-- Collection
+collection @panel of widget
 
 -- Multi-push (relation)
 person <- "Alice", 30, 95.5
@@ -1035,7 +1070,7 @@ for @packets {|src, dst, payload|
     -- confined bindings
 }
 
--- Iteration with match (union)
+-- Iteration with match (union/collection)
 for @panel {
     match button {|label, onclick| ... }
     match radio {|label, group, selected| ... }
@@ -1057,8 +1092,8 @@ for @panel {
 |--------------|-----|
 | Coordinate existing stacks | `relation` |
 | Define a reusable structure | `constitution` |
-| Allow one of several shapes | `union` (`A \| B \| C`) |
-| Store ordered mixed elements | `sequence(union)` |
+| Allow one of several shapes | `union` |
+| Store ordered mixed elements | `collection` |
 | Store multiple instances of one shape | `stack.new(constitution)` |
 | Work with heterogeneous data temporarily | `.tuple()` or `for` with relation |
 | Handle unknown schemas | Query interface (external) |
@@ -1072,7 +1107,7 @@ for @panel {
 | Relation | Struct with pointers to slices |
 | Constitution | Multiple parallel slices |
 | Union | Discriminant slice + per-variant stores |
-| Sequence | Order slice + union stores |
+| Collection | Order slice + union stores |
 | Tuple bindings | Local variables (block-scoped) |
 
 ### What Doesn't Exist at Runtime
@@ -1093,7 +1128,7 @@ ual's approach to heterogeneous data rests on a simple insight: **the problems w
 
 Traditional languages struggle because values travel freely, so types must travel with them — leading to tagging, boxing, and erasure.
 
-ual confines heterogeneity to lexical blocks. Inside, you have full typed access. Outside, only typed stacks exist. Relations coordinate without reifying. Constitutions define structure without creating escapable objects. Unions allow variation without type erasure. Sequences preserve order without sacrificing type safety.
+ual confines heterogeneity to lexical blocks. Inside, you have full typed access. Outside, only typed stacks exist. Relations coordinate without reifying. Constitutions define structure without creating escapable objects. Unions allow variation without type erasure. Collections preserve order without sacrificing type safety.
 
 The result: dense storage, static types, predictable iteration, and no per-value tags. The sophistication is in the language semantics. The generated code is simple.
 
