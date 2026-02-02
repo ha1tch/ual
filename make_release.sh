@@ -3,7 +3,7 @@
 
 set -e
 
-VERSION="${1:-0.7.4}"
+VERSION="${1:-`cat VERSION`}"
 OUTPUT="ual-${VERSION}.zip"
 
 if [ ! -f ".gitignore" ]; then
