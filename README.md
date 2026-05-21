@@ -387,7 +387,7 @@ ual is a **systems language disguised as a scripting language**:
 
 Copyright (C) 2025 haitch
 
-h@ual.fi
+h@ual.li
 
 https://oldbytes.space/@haitchfive
 
